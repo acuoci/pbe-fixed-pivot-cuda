@@ -114,6 +114,7 @@ endif()
 # ── Sub-directories ───────────────────────────────────────────────────────────
 if(PBE_BUILD_EXAMPLES)
     add_subdirectory(examples/homogeneous_batch)
+    add_subdirectory(examples/homogeneous_batch_breakage)
 endif()
 
 if(PBE_BUILD_TESTS)
