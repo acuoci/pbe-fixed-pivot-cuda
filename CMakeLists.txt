@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.18)
 
+# ── CUDA architecture — MUST be set before project() ─────────────────────────
+# CMake initialises CMAKE_CUDA_ARCHITECTURES during project(), so setting it
+# afterwards has no effect on the default. sm_86 = A30/RTX3090 (Ampere).
+# Override at configure time with: cmake -DCMAKE_CUDA_ARCHITECTURES="80;86" ..
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 86 CACHE STRING "CUDA architectures to compile for" FORCE)
+endif()
+
 # ── Project definition ────────────────────────────────────────────────────────
 project(pbe_cuda
     VERSION      1.0.0
@@ -11,20 +19,11 @@ project(pbe_cuda
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)   # Generates compile_commands.json for clangd/VS Code
 
-# ── CUDA architecture ─────────────────────────────────────────────────────────
-# sm_86 = A30, RTX 3090 (Ampere)
-# sm_80 = A100 (Ampere)
-# Users can override at configure time:
-#   cmake -DCMAKE_CUDA_ARCHITECTURES="80;86" ..
-if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES 80 86)
-endif()
-
 # ── C++ / CUDA standards ──────────────────────────────────────────────────────
 set(CMAKE_CXX_STANDARD          20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS        OFF)
-set(CMAKE_CUDA_STANDARD         20)
+set(CMAKE_CUDA_STANDARD         17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 # ── Build type default ────────────────────────────────────────────────────────
@@ -68,6 +67,13 @@ function(pbe_configure_target target_name)
         VERSION                     ${PROJECT_VERSION}
         SOVERSION                   ${PROJECT_VERSION_MAJOR}
         PUBLIC_HEADER               "${PBE_PUBLIC_HEADERS}"
+    )
+    # Explicitly pass compute capability to nvcc.
+    # This ensures double-precision atomicAdd (sm_60+) is visible and that
+    # PTX/SASS is generated for the correct target architecture.
+    target_compile_options(${target_name} PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:
+            --generate-code arch=compute_86,code=sm_86>
     )
     if(PBE_ENABLE_WARNINGS)
         target_compile_options(${target_name} PRIVATE
