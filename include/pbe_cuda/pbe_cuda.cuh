@@ -1,0 +1,18 @@
+// =============================================================================
+// pbe_cuda.cuh  —  Umbrella header for the pbe_cuda library
+//
+// Include this single header to access the full public API:
+//
+//   #include <pbe_cuda/pbe_cuda.cuh>
+//
+// Alternatively, include individual module headers if you only need
+// part of the library:
+//
+//   #include <pbe_cuda/aggregation.cuh>
+//   #include <pbe_cuda/breakage.cuh>
+// =============================================================================
+
+#pragma once
+
+#include "pbe_cuda/aggregation.cuh"
+#include "pbe_cuda/breakage.cuh"
