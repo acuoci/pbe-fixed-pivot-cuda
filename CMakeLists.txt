@@ -2,10 +2,14 @@ cmake_minimum_required(VERSION 3.18)
 
 # ── CUDA architecture — MUST be set before project() ─────────────────────────
 # CMake initialises CMAKE_CUDA_ARCHITECTURES during project(), so setting it
-# afterwards has no effect on the default. sm_86 = A30/RTX3090 (Ampere).
+# afterwards has no effect on the default.
 # Override at configure time with: cmake -DCMAKE_CUDA_ARCHITECTURES="80;86" ..
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES 86 CACHE STRING "CUDA architectures to compile for" FORCE)
+    # sm_80 = A100, A30
+    # sm_86 = RTX 3090, A40, RTX 30xx
+    # Both are Ampere but different compute capabilities —
+    # sm_86 code does NOT run on sm_80 hardware.
+    set(CMAKE_CUDA_ARCHITECTURES 80 86 CACHE STRING "CUDA architectures to compile for" FORCE)
 endif()
 
 # ── Project definition ────────────────────────────────────────────────────────
