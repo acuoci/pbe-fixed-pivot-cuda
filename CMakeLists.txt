@@ -111,10 +111,19 @@ elseif(PBE_BUILD_SHARED)
     add_library(pbe_cuda::pbe_cuda ALIAS pbe_cuda_shared)
 endif()
 
+# Common utilities header — interface target so examples can include it
+add_library(pbe_examples_common INTERFACE)
+target_include_directories(pbe_examples_common INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/examples/common
+)
+
 # ── Sub-directories ───────────────────────────────────────────────────────────
 if(PBE_BUILD_EXAMPLES)
-    add_subdirectory(examples/homogeneous_batch)
-    add_subdirectory(examples/homogeneous_batch_breakage)
+    add_subdirectory(examples/aggregation_constant)
+    add_subdirectory(examples/aggregation_sum)
+    add_subdirectory(examples/aggregation_product)
+    add_subdirectory(examples/breakage_linear_uniform)
+    add_subdirectory(examples/breakage_linear_symmetricbinary)
 endif()
 
 if(PBE_BUILD_TESTS)
