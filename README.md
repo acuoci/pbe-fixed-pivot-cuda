@@ -2,11 +2,11 @@
 
 **GPU-accelerated Fixed Pivot Method for Population Balance Equations (PBE) — aggregation and breakage CUDA kernels**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21428566.svg)](https://doi.org/10.5281/zenodo.21428566)
 
 > **Associated publication:**
-> A. Cuoci, *GPU-Accelerated Fixed-Pivot Population Balance Simulations: Enabling High-Resolution Modeling of Aggregation–Breakage Systems*, submitted to [Journal Name], 2026.
+> A. Cuoci, *GPU-Accelerated Fixed-Pivot Population Balance Simulations: Enabling High-Resolution Modeling of Aggregation–Breakage Systems*, submitted to Next Chemical Engineering, 2026.
 
 ---
 
@@ -316,8 +316,8 @@ If you use this library in your research, please cite both the software and the 
   title     = {pbe-fixed-pivot-cuda: GPU-accelerated Fixed Pivot Method for Population Balance Equations},
   year      = {2026},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.XXXXXXX},
-  url       = {https://github.com/YOUR_USERNAME/pbe-fixed-pivot-cuda}
+  doi       = {10.5281/zenodo.21428566},
+  url       = {https://github.com/acuoci/pbe-fixed-pivot-cuda}
 }
 ```
 
@@ -327,7 +327,7 @@ If you use this library in your research, please cite both the software and the 
   author  = {Cuoci, Alberto},
   title   = {GPU-Accelerated Fixed-Pivot Population Balance Simulations:
              Enabling High-Resolution Modeling of Aggregation--Breakage Systems},
-  journal = {[Journal Name]},
+  journal = {Next Chemical Engineering},
   year    = {2026},
   doi     = {[DOI]}
 }
