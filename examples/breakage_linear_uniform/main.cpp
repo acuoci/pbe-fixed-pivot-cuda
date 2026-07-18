@@ -29,9 +29,10 @@ namespace cfg {
     constexpr double N0       = 1.0;
     constexpr double vc       = 1.0;
     constexpr double S0       = 1.0;
+
     // Uniform daughter distribution — 8-point Gauss-Legendre on (0,1)
     constexpr int    n_quad   = 8;
-    constexpr double t_end    = 5.0;    // tau = S0*t_end = 5 (matches paper)
+    constexpr double t_end    = 5.0;    // tau = S0*t_end = 5 
     constexpr int    n_steps  = 5000;
     constexpr int    n_print  = 500;
 }
@@ -111,12 +112,26 @@ int main()
     print_table_header("tau", "M0 num", "M0 exact", "Err M0",
                        "M1 num", "Err M1");
 
+   // ---- Define RHS function --------------------------------------------
+    auto rhs_func = [&](const DeviceArray<double>& N_in,
+                        DeviceArray<double>&       rhs_out) 
+    {
+        rhs_out.zero();
+        cudaError_t err = pbe_cuda::launch_breakage_rhs(
+            N_in.get(), d_x.get(), d_t_q.get(), d_bw_q.get(),
+            rhs_out.get(), p);
+        if (err != cudaSuccess) {
+            std::fprintf(stderr, "Kernel error: %s\n", cudaGetErrorString(err));
+            std::exit(EXIT_FAILURE);
+        }
+        PBE_CUDA_CHECK(cudaDeviceSynchronize());
+    };
+
     double t = 0.0;
-    std::vector<double> rhs_host(cfg::n);
-
-    for (int step = 0; step <= cfg::n_steps; ++step) {
-
-        if (step % cfg::n_print == 0) {
+    for (int step = 0; step <= cfg::n_steps; ++step) 
+    {
+        if (step % cfg::n_print == 0) 
+        {
             d_N.download(N_host);
             double M0_num = compute_M0(N_host);
             double M1_num = compute_M1(N_host, x_host);
@@ -124,26 +139,12 @@ int main()
             double err_M0 = std::abs(M0_num - M0_ana) / M0_ana;
             double err_M1 = std::abs(M1_num - M1_ref) / M1_ref;
             // Print tau instead of t
-            print_table_row(cfg::S0 * t, M0_num, M0_ana, err_M0,
-                            M1_num, err_M1);
+            print_table_row(cfg::S0 * t, M0_num, M0_ana, err_M0, M1_num, err_M1);
         }
 
         if (step == cfg::n_steps) break;
 
-        d_rhs.zero();
-        cudaError_t err = pbe_cuda::launch_breakage_rhs(
-            d_N.get(), d_x.get(), d_t_q.get(), d_bw_q.get(), d_rhs.get(), p);
-        if (err != cudaSuccess) {
-            std::fprintf(stderr, "Kernel error: %s\n", cudaGetErrorString(err));
-            return EXIT_FAILURE;
-        }
-        PBE_CUDA_CHECK(cudaDeviceSynchronize());
-
-        d_N.download(N_host);
-        d_rhs.download(rhs_host);
-        for (int i = 0; i < cfg::n; ++i)
-            N_host[i] += dt * rhs_host[i];
-        d_N.upload(N_host);
+        euler_step(d_N, d_rhs, rhs_func, dt, cfg::n);
         t += dt;
     }
 

@@ -80,40 +80,22 @@ int main()
     print_table_header("t", "M0 num", "M0 exact", "Err M0", "M1 num", "Err M1");
 
 
-    // ---- RK4 time integration -------------------------------------------
-    // Requires 4 RHS evaluations per step.
-    // k1 = R(N^n)
-    // k2 = R(N^n + dt/2 * k1)
-    // k3 = R(N^n + dt/2 * k2)
-    // k4 = R(N^n + dt   * k3)
-    // N^(n+1) = N^n + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
-
-    // Extra device arrays for RK4 stages
-    DeviceArray<double> d_N_stage(cfg::n);   // N^n + dt/2 * ki
-    DeviceArray<double> d_k1(cfg::n), d_k2(cfg::n),
-                        d_k3(cfg::n), d_k4(cfg::n);
-
-    // Host arrays for RK4 arithmetic (done on host for clarity)
-    std::vector<double> k1(cfg::n), k2(cfg::n),
-                        k3(cfg::n), k4(cfg::n);
-    std::vector<double> N_stage(cfg::n);
-
-    double t = 0.0;
-
-    // Helper lambda: evaluate RHS into d_rhs, download to k_host
-    auto eval_rhs = [&](DeviceArray<double>& d_N_in,
-                         std::vector<double>& k_host) {
-        d_rhs.zero();
+    // ---- Define RHS function --------------------------------------------
+    auto rhs_func = [&](const DeviceArray<double>& N_in,
+                        DeviceArray<double>&       rhs_out) 
+    {
+        rhs_out.zero();
         cudaError_t err = pbe_cuda::launch_aggregation_rhs(
-            d_N_in.get(), d_x.get(), d_rhs.get(), p);
+            N_in.get(), d_x.get(), rhs_out.get(), p);
         if (err != cudaSuccess) {
             std::fprintf(stderr, "Kernel error: %s\n", cudaGetErrorString(err));
             std::exit(EXIT_FAILURE);
         }
         PBE_CUDA_CHECK(cudaDeviceSynchronize());
-        d_rhs.download(k_host);
     };
 
+    // ---- Time loop -------------------------------------------------------
+    double t = 0.0;
     for (int step = 0; step <= cfg::n_steps; ++step) {
 
         if (step % cfg::n_print == 0) {
@@ -127,35 +109,7 @@ int main()
         }
 
         if (step == cfg::n_steps) break;
-
-        // Download current N
-        d_N.download(N_host);
-
-        // k1 = R(N^n)
-        eval_rhs(d_N, k1);
-
-        // k2 = R(N^n + dt/2 * k1)
-        for (int i = 0; i < cfg::n; ++i)
-            N_stage[i] = N_host[i] + 0.5 * dt * k1[i];
-        d_N_stage.upload(N_stage);
-        eval_rhs(d_N_stage, k2);
-
-        // k3 = R(N^n + dt/2 * k2)
-        for (int i = 0; i < cfg::n; ++i)
-            N_stage[i] = N_host[i] + 0.5 * dt * k2[i];
-        d_N_stage.upload(N_stage);
-        eval_rhs(d_N_stage, k3);
-
-        // k4 = R(N^n + dt * k3)
-        for (int i = 0; i < cfg::n; ++i)
-            N_stage[i] = N_host[i] + dt * k3[i];
-        d_N_stage.upload(N_stage);
-        eval_rhs(d_N_stage, k4);
-
-        // N^(n+1) = N^n + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
-        for (int i = 0; i < cfg::n; ++i)
-            N_host[i] += (dt / 6.0) * (k1[i] + 2.0*k2[i] + 2.0*k3[i] + k4[i]);
-        d_N.upload(N_host);
+        rk4_step(d_N, d_rhs, rhs_func, dt, cfg::n);
         t += dt;
     }
 

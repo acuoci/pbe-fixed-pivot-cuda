@@ -116,13 +116,25 @@ int main()
     print_table_header("Time [s]", "N_tot num.", "N_tot exact",
                        "Err N_tot", "M1 num", "Err M1");
 
-    // ---- Time loop -------------------------------------------------------
-    std::vector<double> rhs_host(cfg::n);
+    // ---- Define RHS function --------------------------------------------
+    auto rhs_func = [&](const DeviceArray<double>& N_in,
+                        DeviceArray<double>&      rhs_out) 
+    {
+        rhs_out.zero();
+        cudaError_t err = pbe_cuda::launch_aggregation_rhs(
+            N_in.get(), d_x.get(), rhs_out.get(), params);
+        if (err != cudaSuccess) {
+            std::fprintf(stderr, "Kernel error: %s\n", cudaGetErrorString(err));
+            std::exit(EXIT_FAILURE);
+        }
+        PBE_CUDA_CHECK(cudaDeviceSynchronize());
+    };
+
     double t = 0.0;
-
-    for (int step = 0; step <= cfg::n_steps; ++step) {
-
-        if (step % cfg::n_print == 0) {
+    for (int step = 0; step <= cfg::n_steps; ++step) 
+    {
+        if (step % cfg::n_print == 0) 
+        {
             d_N.download(N_host);
             double N_num   = compute_M0(N_host);
             double M1_num  = compute_M1(N_host, x_host);
@@ -133,22 +145,8 @@ int main()
         }
 
         if (step == cfg::n_steps) break;
-
-        d_rhs.zero();
-        cudaError_t err = pbe_cuda::launch_aggregation_rhs(
-            d_N.get(), d_x.get(), d_rhs.get(), params);
-        if (err != cudaSuccess) {
-            std::fprintf(stderr, "launch_aggregation_rhs failed: %s\n",
-                         cudaGetErrorString(err));
-            return EXIT_FAILURE;
-        }
-        PBE_CUDA_CHECK(cudaDeviceSynchronize());
-
-        d_N.download(N_host);
-        d_rhs.download(rhs_host);
-        for (int i = 0; i < cfg::n; ++i)
-            N_host[i] += dt * rhs_host[i];
-        d_N.upload(N_host);
+        
+        euler_step(d_N, d_rhs, rhs_func, dt, cfg::n);
         t += dt;
     }
 
