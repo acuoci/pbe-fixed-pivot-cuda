@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "pbe-fixed-pivot-cuda: GPU-accelerated Fixed Pivot Method for Population Balance Equations"
+authors:
+  - family-names: "Cuoci"
+    given-names: "Alberto"
+    orcid: "https://orcid.org/0000-0001-5653-0180"
+    affiliation: "Politecnico di Milano"
+version: 1.0.0
+date-released: "2026-07-18"
+license: GPLv3
+repository-code: "https://github.com/acuoci/pbe-fixed-pivot-cuda"
+doi: "10.5281/zenodo.21428566"
+keywords:
+  - CUDA
+  - population balance equations
+  - aggregation
+  - breakage
+  - fixed pivot
+  - HPC
+  - scientific computing
+preferred-citation:
+  type: article
+  title: "GPU-Accelerated Fixed-Pivot Population Balance Simulations: Enabling High-Resolution Modeling of Aggregation-Breakage Systems"
+  authors:
+    - family-names: "Cuoci"
+      given-names: "Alberto"
+      orcid: "https://orcid.org/0000-0001-5653-0180"
+  journal: "Next Chemical Engineering (submitted)"
+  year: 2026
+  doi: "[Paper DOI — fill in when available]"
