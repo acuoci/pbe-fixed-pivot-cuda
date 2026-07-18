@@ -124,6 +124,7 @@ if(PBE_BUILD_EXAMPLES)
     add_subdirectory(examples/aggregation_product)
     add_subdirectory(examples/breakage_linear_uniform)
     add_subdirectory(examples/breakage_linear_symmetricbinary)
+    add_subdirectory(examples/flocculation_two_stage)
 endif()
 
 if(PBE_BUILD_TESTS)

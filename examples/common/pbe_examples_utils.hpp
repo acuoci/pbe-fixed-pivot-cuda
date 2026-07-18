@@ -135,6 +135,28 @@ inline std::vector<double> make_exponential_ic(const std::vector<double>& x,
     return N;
 }
 
+// Log-normal IC in natural-log(x_nd) space, centered at x_nd=1 (d=d0).
+// Matches Python make_initial_condition(x_nd, dx_nd, sigma=0.3):
+//   N_ic ~ exp(-0.5*(ln(x_nd)/sigma)^2) * dx_nd,  normalised to sum(N)=1
+// sigma=0.3 in ln space gives M1=1.1445 for the flocculation grid.
+inline std::vector<double> make_lognormal_ic_nd(const std::vector<double>& x_nd,
+                                                  double sigma_ln = 0.3)
+{
+    int n = static_cast<int>(x_nd.size());
+    double log_r = std::log(x_nd[1] / x_nd[0]);   // = log_ratio
+    std::vector<double> N(n);
+    double sum = 0.0;
+    for (int i = 0; i < n; ++i) {
+        double ln_x   = std::log(x_nd[i]);          // natural log, not log10
+        double dx_nd_i = x_nd[i] * log_r;
+        N[i] = std::exp(-0.5 * (ln_x / sigma_ln) * (ln_x / sigma_ln))
+               * dx_nd_i;
+        sum += N[i];
+    }
+    for (int i = 0; i < n; ++i) N[i] /= sum;
+    return N;
+}
+
 // ---------------------------------------------------------------------------
 // Moment computation
 // ---------------------------------------------------------------------------
