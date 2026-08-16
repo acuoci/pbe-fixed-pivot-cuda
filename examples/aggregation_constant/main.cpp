@@ -96,7 +96,8 @@ int main()
     params.inv_log_r   = inv_logr;
     params.kernel_type = pbe_cuda::AggregationKernel::Constant;
     params.beta0       = cfg::beta0;
-    params.beta_br     = 0.0;
+    params.beta_bc     = 0.0;
+    params.beta_bfm    = 0.0;
     params.beta_sh     = 0.0;
     params.block_size  = 256;
 

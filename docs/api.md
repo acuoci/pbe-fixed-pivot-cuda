@@ -26,9 +26,11 @@ enum class AggregationKernel : int {
     Constant      = 0,   // β = β₀
     Sum           = 1,   // β = β₀ (u + v)
     Product       = 2,   // β = β₀ u v
-    Brownian      = 3,   // β = β_br (u^(1/3)/v^(1/3) + v^(1/3)/u^(1/3) + 2)
-    Shear         = 4,   // β = β_sh (u^(1/3) + v^(1/3))³
-    BrownianShear = 5    // β = Brownian + Shear
+    BrownianContinuum          = 3,
+    BrownianFreeMolecular      = 4,
+    Shear                      = 5,
+    BrownianContinuumShear     = 6,
+    BrownianFreeMolecularShear = 7
 };
 ```
 
@@ -47,8 +49,9 @@ struct AggregationParams {
     // Kernel type and coefficients
     AggregationKernel kernel_type = AggregationKernel::Constant;
     double beta0   = 1.0;     // Prefactor for Constant / Sum / Product kernels
-    double beta_br = 0.0;     // Brownian prefactor (Brownian, BrownianShear)
-    double beta_sh = 0.0;     // Shear prefactor    (Shear, BrownianShear)
+    double beta_bc  = 0.0;    // Continuum Brownian prefactor
+    double beta_bfm = 0.0;    // Free-molecular Brownian prefactor
+    double beta_sh  = 0.0;    // Shear prefactor
 
     // Launch configuration
     int block_size = 256;     // CUDA threads per block (must be power of 2)
@@ -106,8 +109,9 @@ pbe_cuda::AggregationParams p;
 p.n           = 256;
 p.log_x0      = std::log(x_host[0]);
 p.inv_log_r   = 1.0 / std::log(x_host[1] / x_host[0]);
-p.kernel_type = pbe_cuda::AggregationKernel::BrownianShear;
-p.beta_br     = 6.73e-18;   // [m³/s]
+p.kernel_type = pbe_cuda::AggregationKernel::BrownianContinuumShear;
+p.beta_bc     = 6.73e-18;   // continuum Brownian prefactor
+p.beta_bfm    = 0.0;        // free-molecular Brownian prefactor
 p.beta_sh     = (4.0/3.0) * G * std::pow(3.0/(4.0*M_PI), 1.0/3.0);
 
 cudaMemset(d_rhs, 0, p.n * sizeof(double));

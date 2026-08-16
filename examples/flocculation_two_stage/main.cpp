@@ -20,7 +20,7 @@
 //
 // PBE model
 // ---------
-//   Aggregation : Brownian + shear kernel
+//   Aggregation : Brownian continuum + shear kernel
 //     beta_Br(vi,vj) = (2 kB T)/(3 mu) * (Ri+Rj) * (1/Ri + 1/Rj)
 //     beta_Sh(vi,vj) = (4/3) G (Ri+Rj)^3
 //     Ri = (3vi/(4pi))^(1/3)
@@ -69,7 +69,7 @@
 // t_nd = t/t_c     (dimensionless time, t_c = 1/(beta0*N0))
 //
 // Kernel coefficients in dimensionless form (from Python):
-//   beta_br_nd = 0.25
+//   beta_bc_nd = 0.25
 //   beta_sh_nd = G * v0 / (pi * beta0)     [changes with G each stage]
 //
 // RHS: dN_nd/dt_nd = R_nd(N_nd, x_nd)
@@ -124,8 +124,8 @@ namespace cfg {
 struct Params {
     double v0;        // primary particle volume [m³]
     double N0;        // number concentration scale [#/m³]
-    double beta_br;   // Brownian prefactor = 2kBT/(3mu) [m³/s]
-    double beta0;     // reference = 4*beta_br [m³/s]
+    double beta_bc;   // continuum Brownian prefactor = 2kBT/(3mu) [m³/s]
+    double beta0;     // reference = 4*beta_bc [m³/s]
     double t_c;       // collision timescale [s]
     double v_min_nd;  // dimensionless grid min
     double v_max_nd;  // dimensionless grid max
@@ -140,15 +140,15 @@ static Params make_params()
     p.v_min_nd  = std::pow(cfg::d_min/cfg::d0, 3.0);
     p.v_max_nd  = std::pow(cfg::d_max/cfg::d0, 3.0);
     p.N0      = cfg::phi / p.v0;
-    p.beta_br = 2.0 * kB * cfg::T / (3.0 * cfg::mu);
-    p.beta0   = 4.0 * p.beta_br;   // self-collision reference
+    p.beta_bc = 2.0 * kB * cfg::T / (3.0 * cfg::mu);
+    p.beta0   = 4.0 * p.beta_bc;   // self-collision reference
     p.t_c     = 1.0 / (p.beta0 * p.N0);
     return p;
 }
 
 // ---------------------------------------------------------------------------
 // Dimensionless kernel coefficients (matching Python exactly)
-//   beta_br_nd = 0.25
+//   beta_bc_nd = 0.25
 //   beta_sh_nd = G * v0 / (pi * beta0)
 // ---------------------------------------------------------------------------
 static pbe_cuda::AggregationParams make_agg_params_nd(
@@ -159,9 +159,10 @@ static pbe_cuda::AggregationParams make_agg_params_nd(
     ap.n           = n;
     ap.log_x0      = log_x0;
     ap.inv_log_r   = inv_log_r;
-    ap.kernel_type = pbe_cuda::AggregationKernel::BrownianShear;
+    ap.kernel_type = pbe_cuda::AggregationKernel::BrownianContinuumShear;
     ap.beta0       = 0.0;
-    ap.beta_br     = 0.25;                              // dimensionless Brownian
+    ap.beta_bc     = 0.25;                              // dimensionless continuum Brownian
+    ap.beta_bfm    = 0.0;
     ap.beta_sh     = G * p.v0 / (M_PI * p.beta0);     // dimensionless shear
     ap.block_size  = 256;
     return ap;
@@ -225,7 +226,7 @@ int main()
     std::printf("  d0       = %.1f um\n",   cfg::d0*1e6);
     std::printf("  phi      = %.0e\n",      cfg::phi);
     std::printf("  N0       = %.3e /m3\n",  p.N0);
-    std::printf("  beta_br  = %.3e m3/s\n", p.beta_br);
+    std::printf("  beta_bc  = %.3e m3/s\n", p.beta_bc);
     std::printf("  beta0    = %.3e m3/s\n", p.beta0);
     std::printf("  t_c      = %.2f s\n",    p.t_c);
     std::printf("  d_crit   = %.1f um  (v_nd_crit = %.0f)\n",

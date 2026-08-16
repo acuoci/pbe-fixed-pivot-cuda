@@ -243,6 +243,77 @@ TEST(CpuAggregation, ProductKernelAnalytical)
     EXPECT_LT(err_M2, 5.0e-2);
 }
 
+TEST(CpuAggregation, BrownianAndShearVariantsConserveVolume)
+{
+    constexpr int n = 64;
+    const auto x = make_geometric_grid(n, 1.0e-18, 1.122018);
+
+    const pbe_cuda::AggregationKernel kernels[] = {
+        pbe_cuda::AggregationKernel::BrownianContinuum,
+        pbe_cuda::AggregationKernel::BrownianFreeMolecular,
+        pbe_cuda::AggregationKernel::Shear,
+        pbe_cuda::AggregationKernel::BrownianContinuumShear,
+        pbe_cuda::AggregationKernel::BrownianFreeMolecularShear
+    };
+
+    for (auto kernel : kernels) {
+        std::vector<double> N(n);
+        for (int i = 0; i < n / 3; ++i)
+            N[i] = 1.0e9 * std::exp(-static_cast<double>(i) / 12.0);
+
+        std::vector<double> rhs(n, 0.0);
+        pbe_cuda::AggregationParams params;
+        params.n = n;
+        params.log_x0 = std::log(x[0]);
+        params.inv_log_r = 1.0 / std::log(x[1] / x[0]);
+        params.kernel_type = kernel;
+        params.beta_bc = 1.2e-8;
+        params.beta_bfm = 2.5e-9;
+        params.beta_sh = 7.5e-10;
+
+        ASSERT_EQ(pbe_cuda::launch_aggregation_rhs_cpu(
+                      N.data(), x.data(), rhs.data(), params),
+                  cudaSuccess);
+
+        double dM1 = 0.0;
+        double M1 = 0.0;
+        for (int i = 0; i < n; ++i) {
+            dM1 += rhs[i] * x[i];
+            M1 += N[i] * x[i];
+        }
+        EXPECT_NEAR(dM1, 0.0, 1.0e-6 * std::abs(M1))
+            << "kernel=" << static_cast<int>(kernel);
+    }
+}
+
+TEST(CpuAggregation, BrownianFreeMolecularSelfCollisionReference)
+{
+    const std::vector<double> x = {1.0, 2.0, 4.0};
+    const std::vector<double> N = {3.0, 0.0, 0.0};
+    std::vector<double> rhs(3, 0.0);
+
+    constexpr double beta_bfm = 2.5;
+    pbe_cuda::AggregationParams params;
+    params.n = static_cast<int>(x.size());
+    params.log_x0 = std::log(x[0]);
+    params.inv_log_r = 1.0 / std::log(x[1] / x[0]);
+    params.kernel_type = pbe_cuda::AggregationKernel::BrownianFreeMolecular;
+    params.beta_bfm = beta_bfm;
+
+    ASSERT_EQ(pbe_cuda::launch_aggregation_rhs_cpu(
+                  N.data(), x.data(), rhs.data(), params),
+              cudaSuccess);
+
+    const double ri = std::cbrt(x[0]);
+    const double s = ri + ri;
+    const double beta = beta_bfm * s * s * std::sqrt(1.0 / x[0] + 1.0 / x[0]);
+    const double rate = 0.5 * beta * N[0] * N[0];
+
+    EXPECT_DOUBLE_EQ(rhs[0], -2.0 * rate);
+    EXPECT_DOUBLE_EQ(rhs[1], rate);
+    EXPECT_DOUBLE_EQ(rhs[2], 0.0);
+}
+
 TEST(CpuBreakage, LinearSymmetricBinaryAnalytical)
 {
     constexpr int n = 512;

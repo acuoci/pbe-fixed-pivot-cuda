@@ -22,9 +22,11 @@ cudaError_t launch_aggregation_rhs_cpu(
         case AggregationKernel::Constant:
         case AggregationKernel::Sum:
         case AggregationKernel::Product:
-        case AggregationKernel::Brownian:
+        case AggregationKernel::BrownianContinuum:
+        case AggregationKernel::BrownianFreeMolecular:
         case AggregationKernel::Shear:
-        case AggregationKernel::BrownianShear:
+        case AggregationKernel::BrownianContinuumShear:
+        case AggregationKernel::BrownianFreeMolecularShear:
             break;
         default:
             return cudaErrorInvalidValue;
@@ -38,7 +40,7 @@ cudaError_t launch_aggregation_rhs_cpu(
             const double xk = x[k];
             const double Nk = N[k];
             const double beta_jk = detail::eval_aggregation_kernel_cpu(
-                p.kernel_type, xj, xk, p.beta0, p.beta_br, p.beta_sh);
+                p.kernel_type, xj, xk, p.beta0, p.beta_bc, p.beta_bfm, p.beta_sh);
 
             double rate = beta_jk * Nj * Nk;
             if (j == k) rate *= 0.5;

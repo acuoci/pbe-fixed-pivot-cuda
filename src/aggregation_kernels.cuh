@@ -45,63 +45,85 @@ static constexpr int TILE = PBE_TILE;
 //   0 = Constant
 //   1 = Sum
 //   2 = Product
-//   3 = Brownian
-//   4 = Shear
-//   5 = BrownianShear
+//   3 = BrownianContinuum
+//   4 = BrownianFreeMolecular
+//   5 = Shear
+//   6 = BrownianContinuumShear
+//   7 = BrownianFreeMolecularShear
 // ---------------------------------------------------------------------------
 template<int FLAG>
 __device__ double eval_kernel_t(double xj, double xk,
-                                double b0, double b_br, double b_sh);
+                                double b0, double b_bc, double b_bfm, double b_sh);
 
 template<> __device__ inline double
-eval_kernel_t<0>(double xj, double xk, double b0, double, double)
+eval_kernel_t<0>(double xj, double xk, double b0, double, double, double)
 { return b0; }
 
 template<> __device__ inline double
-eval_kernel_t<1>(double xj, double xk, double b0, double, double)
+eval_kernel_t<1>(double xj, double xk, double b0, double, double, double)
 { return b0 * (xj + xk); }
 
 template<> __device__ inline double
-eval_kernel_t<2>(double xj, double xk, double b0, double, double)
+eval_kernel_t<2>(double xj, double xk, double b0, double, double, double)
 { return b0 * xj * xk; }
 
 template<> __device__ inline double
-eval_kernel_t<3>(double xj, double xk, double b0, double b_br, double)
+eval_kernel_t<3>(double xj, double xk, double, double b_bc, double, double)
 {
     double xj3 = cbrt(xj), xk3 = cbrt(xk);
-    return b_br * (xj3 / xk3 + xk3 / xj3 + 2.0);
+    return b_bc * (xj3 / xk3 + xk3 / xj3 + 2.0);
 }
 
 template<> __device__ inline double
-eval_kernel_t<4>(double xj, double xk, double b0, double, double b_sh)
+eval_kernel_t<4>(double xj, double xk, double, double, double b_bfm, double)
+{
+    double xj3 = cbrt(xj), xk3 = cbrt(xk);
+    double s = xj3 + xk3;
+    return b_bfm * s * s * sqrt(1.0 / xj + 1.0 / xk);
+}
+
+template<> __device__ inline double
+eval_kernel_t<5>(double xj, double xk, double, double, double, double b_sh)
 {
     double s = cbrt(xj) + cbrt(xk);
     return b_sh * s * s * s;
 }
 
 template<> __device__ inline double
-eval_kernel_t<5>(double xj, double xk, double, double b_br, double b_sh)
+eval_kernel_t<6>(double xj, double xk, double, double b_bc, double, double b_sh)
 {
     double xj3 = cbrt(xj), xk3 = cbrt(xk);
-    double br  = b_br * (xj3 / xk3 + xk3 / xj3 + 2.0);
+    double br  = b_bc * (xj3 / xk3 + xk3 / xj3 + 2.0);
     double sh  = b_sh * (xj3 + xk3) * (xj3 + xk3) * (xj3 + xk3);
     return br + sh;
+}
+
+template<> __device__ inline double
+eval_kernel_t<7>(double xj, double xk, double, double, double b_bfm, double b_sh)
+{
+    double xj3 = cbrt(xj), xk3 = cbrt(xk);
+    double s = xj3 + xk3;
+    double bfm = b_bfm * s * s * sqrt(1.0 / xj + 1.0 / xk);
+    double sh = b_sh * s * s * s;
+    return bfm + sh;
 }
 
 // ---------------------------------------------------------------------------
 // Runtime dispatcher — uniform branch across all threads in a launch.
 // ---------------------------------------------------------------------------
 __device__ inline double dispatch_kernel(double xj, double xk,
-                                         double b0, double b_br, double b_sh,
+                                         double b0, double b_bc, double b_bfm, double b_sh,
                                          int flag)
 {
     switch (flag) {
-        case 0: return eval_kernel_t<0>(xj, xk, b0, b_br, b_sh);
-        case 1: return eval_kernel_t<1>(xj, xk, b0, b_br, b_sh);
-        case 2: return eval_kernel_t<2>(xj, xk, b0, b_br, b_sh);
-        case 3: return eval_kernel_t<3>(xj, xk, b0, b_br, b_sh);
-        case 4: return eval_kernel_t<4>(xj, xk, b0, b_br, b_sh);
-        case 5: return eval_kernel_t<5>(xj, xk, b0, b_br, b_sh);
+        case 0: return eval_kernel_t<0>(xj, xk, b0, b_bc, b_bfm, b_sh);
+        case 1: return eval_kernel_t<1>(xj, xk, b0, b_bc, b_bfm, b_sh);
+        case 2: return eval_kernel_t<2>(xj, xk, b0, b_bc, b_bfm, b_sh);
+        case 3: return eval_kernel_t<3>(xj, xk, b0, b_bc, b_bfm, b_sh);
+        case 4: return eval_kernel_t<4>(xj, xk, b0, b_bc, b_bfm, b_sh);
+        case 5: return eval_kernel_t<5>(xj, xk, b0, b_bc, b_bfm, b_sh);
+        case 6: return eval_kernel_t<6>(xj, xk, b0, b_bc, b_bfm, b_sh);
+        case 7: return eval_kernel_t<7>(xj, xk, b0, b_bc, b_bfm, b_sh);
         default: return 0.0;
     }
 }
@@ -148,7 +170,8 @@ __global__ void aggregation_rhs_kernel(
     const double* __restrict__ x,
     double*       __restrict__ rhs,
     double        beta0,
-    double        beta_br,
+    double        beta_bc,
+    double        beta_bfm,
     double        beta_sh,
     int           n,
     double        log_x0,
@@ -183,7 +206,7 @@ __global__ void aggregation_rhs_kernel(
             double Nj = __ldg(&N[j]);
             double Nk = __ldg(&N[k]);
 
-            double beta_jk = eval_kernel_t<FLAG>(xj, xk, beta0, beta_br, beta_sh);
+            double beta_jk = eval_kernel_t<FLAG>(xj, xk, beta0, beta_bc, beta_bfm, beta_sh);
             rate = beta_jk * Nj * Nk;
             if (diagonal) rate *= 0.5;
 

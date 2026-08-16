@@ -24,7 +24,7 @@ where `N` is the vector of section-integrated number concentrations. The caller 
 
 ### Key features
 
-- **Aggregation** — six kernels: constant, sum, product, Brownian, shear, Brownian+shear
+- **Aggregation** — eight kernels: constant, sum, product, Brownian continuum, Brownian free-molecular, shear, and both Brownian/shear combinations
 - **Breakage** — four selection functions (constant, linear, power-law, threshold) and four daughter distributions (uniform, symmetric binary, power-law, erosion)
 - **Fixed-pivot redistribution** — exact conservation of particle volume by construction
 - **O(1) bin lookup** for geometric grids; O(log N) binary search fallback for general grids
@@ -37,8 +37,8 @@ where `N` is the vector of section-integrated number concentrations. The caller 
 | Kernel | GPU crossover vs Numba | Speedup vs Numba (N=16384) | Speedup vs NumPy (N=16384) |
 |---|---|---|---|
 | Constant / Sum / Product | N ≈ 64 | ~45–50× | ~70–80× |
-| Brownian / Shear | N ≈ 16 | ~120× | ~105× |
-| Brownian+Shear | N ≈ 16 | ~122× | ~136× |
+| Brownian continuum / Shear | N ≈ 16 | ~120× | ~105× |
+| Brownian continuum + shear | N ≈ 16 | ~122× | ~136× |
 
 For the full aggregation–breakage flocculation case study (N=3840, 30 min simulation): **GPU 37.6 s vs Numba 4064 s vs NumPy 9756 s** (~108× and ~260× speedup respectively).
 
@@ -115,8 +115,9 @@ pbe_cuda::AggregationParams agg;
 agg.n           = 256;                          // number of size sections
 agg.log_x0      = std::log(x_host[0]);          // pre-computed grid parameter
 agg.inv_log_r   = 1.0 / std::log(x_host[1] / x_host[0]);  // geometric ratio
-agg.kernel_type = pbe_cuda::AggregationKernel::BrownianShear;
-agg.beta_br     = 6.73e-18;                     // Brownian prefactor [m³/s]
+agg.kernel_type = pbe_cuda::AggregationKernel::BrownianContinuumShear;
+agg.beta_bc     = 6.73e-18;                     // continuum Brownian prefactor [m³/s]
+agg.beta_bfm    = 0.0;                          // free-molecular Brownian prefactor
 agg.beta_sh     = 4.0 / 3.0 * G;               // shear prefactor [m³/s]
 
 cudaMemset(d_rhs, 0, n * sizeof(double));        // rhs MUST be pre-zeroed
@@ -195,9 +196,11 @@ enum class AggregationKernel : int {
     Constant      = 0,   // β = β₀
     Sum           = 1,   // β = β₀ (u + v)
     Product       = 2,   // β = β₀ u v
-    Brownian      = 3,   // β = β_br (u^(1/3)/v^(1/3) + v^(1/3)/u^(1/3) + 2)
-    Shear         = 4,   // β = β_sh (u^(1/3) + v^(1/3))³
-    BrownianShear = 5    // β = Brownian + Shear
+    BrownianContinuum          = 3,
+    BrownianFreeMolecular      = 4,
+    Shear                      = 5,
+    BrownianContinuumShear     = 6,
+    BrownianFreeMolecularShear = 7
 };
 
 struct AggregationParams {
@@ -206,7 +209,8 @@ struct AggregationParams {
     double inv_log_r;     // 1/log(x[1]/x[0]) — 0.0 for non-geometric grids
     AggregationKernel kernel_type;
     double beta0;         // prefactor for Constant/Sum/Product
-    double beta_br;       // Brownian prefactor
+    double beta_bc;       // continuum Brownian prefactor
+    double beta_bfm;      // free-molecular Brownian prefactor
     double beta_sh;       // shear prefactor
     int    block_size;    // CUDA threads per block (default 256)
 };
@@ -315,7 +319,7 @@ Full mathematical details, CUDA implementation specifics, convergence analyses, 
 
 The implementation was verified against:
 
-- **Aggregation:** Scott (constant), Golovin (sum), and Smoluchowski (product) analytical solutions; Richardson extrapolation for Brownian, shear, and Brownian+shear kernels. Normalized L₁ error converges at approximately second order (1.97–2.11 for the product kernel).
+- **Aggregation:** Scott (constant), Golovin (sum), and Smoluchowski (product) analytical solutions; Richardson extrapolation for Brownian continuum, shear, and combined Brownian/shear kernels. Normalized L₁ error converges at approximately second order (1.97–2.11 for the product kernel).
 - **Breakage:** Ziff–McGrady analytical solution (linear selection + uniform daughter distribution). PSD error < 10⁻³ for dimensionless times τ = S₀t ∈ [1, 5]; moment errors < 10⁻⁵.
 - **Volume conservation:** First moment M₁ preserved to machine precision for all tested configurations.
 

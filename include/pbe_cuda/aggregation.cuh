@@ -25,17 +25,21 @@ namespace pbe_cuda {
 // Constant      β = β₀
 // Sum           β = β₀ (xⱼ + xₖ)
 // Product       β = β₀  xⱼ xₖ
-// Brownian      β = β_br (xⱼ^(1/3)/xₖ^(1/3) + xₖ^(1/3)/xⱼ^(1/3) + 2)
-// Shear         β = β_sh (xⱼ^(1/3) + xₖ^(1/3))³
-// BrownianShear β = Brownian + Shear   (β_br and β_sh both active)
+// BrownianContinuum          β = β_bc (xⱼ^(1/3)/xₖ^(1/3) + xₖ^(1/3)/xⱼ^(1/3) + 2)
+// BrownianFreeMolecular      β = β_bfm (xⱼ^(1/3)+xₖ^(1/3))² sqrt(1/xⱼ + 1/xₖ)
+// Shear                      β = β_sh (xⱼ^(1/3) + xₖ^(1/3))³
+// BrownianContinuumShear     β = BrownianContinuum + Shear
+// BrownianFreeMolecularShear β = BrownianFreeMolecular + Shear
 // ---------------------------------------------------------------------------
 enum class AggregationKernel : int {
-    Constant      = 0,
-    Sum           = 1,
-    Product       = 2,
-    Brownian      = 3,
-    Shear         = 4,
-    BrownianShear = 5
+    Constant                    = 0,
+    Sum                         = 1,
+    Product                     = 2,
+    BrownianContinuum           = 3,
+    BrownianFreeMolecular       = 4,
+    Shear                       = 5,
+    BrownianContinuumShear      = 6,
+    BrownianFreeMolecularShear  = 7
 };
 
 // ---------------------------------------------------------------------------
@@ -50,8 +54,9 @@ enum class AggregationKernel : int {
 //
 // Kernel coefficients:
 //   beta0      Prefactor for Constant / Sum / Product kernels.
-//   beta_br    Brownian prefactor (used by Brownian and BrownianShear).
-//   beta_sh    Shear prefactor    (used by Shear    and BrownianShear).
+//   beta_bc    Continuum Brownian prefactor.
+//   beta_bfm   Free-molecular Brownian prefactor.
+//   beta_sh    Shear prefactor.
 //
 // Launch tuning:
 //   block_size CUDA threads per block (default 256; must be a power of 2).
@@ -65,7 +70,8 @@ struct AggregationParams {
     // Kernel type and coefficients
     AggregationKernel kernel_type = AggregationKernel::Constant;
     double beta0      = 1.0;
-    double beta_br    = 0.0;
+    double beta_bc    = 0.0;
+    double beta_bfm   = 0.0;
     double beta_sh    = 0.0;
 
     // Launch configuration
@@ -106,8 +112,8 @@ struct AggregationParams {
 //   p.n           = 100;
 //   p.log_x0      = std::log(x_host[0]);
 //   p.inv_log_r   = 1.0 / std::log(x_host[1] / x_host[0]);
-//   p.kernel_type = pbe_cuda::AggregationKernel::Brownian;
-//   p.beta_br     = 6.73e-18;  // SI units
+//   p.kernel_type = pbe_cuda::AggregationKernel::BrownianContinuum;
+//   p.beta_bc     = 6.73e-18;  // SI units
 //
 //   cudaMemset(rhs_d, 0, p.n * sizeof(double));
 //   pbe_cuda::launch_aggregation_rhs(N_d, x_d, rhs_d, p);

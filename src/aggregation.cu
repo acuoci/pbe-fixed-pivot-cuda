@@ -40,7 +40,7 @@ cudaError_t launch_aggregation_rhs(
     detail::aggregation_rhs_kernel<F>                                   \
         <<<grid_size, block_size, smem_bytes, stream>>>(                \
             N, x, rhs,                                                  \
-            p.beta0, p.beta_br, p.beta_sh,                              \
+            p.beta0, p.beta_bc, p.beta_bfm, p.beta_sh,                  \
             p.n, p.log_x0, p.inv_log_r);                                \
     break;
 
@@ -50,6 +50,8 @@ cudaError_t launch_aggregation_rhs(
         case 3: LAUNCH(3)
         case 4: LAUNCH(4)
         case 5: LAUNCH(5)
+        case 6: LAUNCH(6)
+        case 7: LAUNCH(7)
 #undef LAUNCH
         default: return cudaErrorInvalidValue;
     }

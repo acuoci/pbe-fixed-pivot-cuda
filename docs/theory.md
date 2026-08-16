@@ -101,11 +101,13 @@ where βⱼₖ = β(xⱼ, xₖ) and δⱼₖ is the Kronecker delta. The first t
 | Constant | β(u,v) = β₀ |
 | Sum | β(u,v) = β₀(u+v) |
 | Product | β(u,v) = β₀ uv |
-| Brownian | β(u,v) = β_Br (u^(1/3)/v^(1/3) + v^(1/3)/u^(1/3) + 2) |
+| Brownian continuum | β(u,v) = β_BC (u^(1/3)/v^(1/3) + v^(1/3)/u^(1/3) + 2) |
+| Brownian free-molecular | β(u,v) = β_BFM (u^(1/3)+v^(1/3))² sqrt(1/u + 1/v) |
 | Shear | β(u,v) = β_Sh (u^(1/3) + v^(1/3))³ |
-| Brownian+Shear | β(u,v) = β_Br(u,v) + β_Sh(u,v) |
+| Brownian continuum + shear | β(u,v) = β_BC(u,v) + β_Sh(u,v) |
+| Brownian free-molecular + shear | β(u,v) = β_BFM(u,v) + β_Sh(u,v) |
 
-The Brownian kernel models perikinetic aggregation due to thermal motion. The shear kernel models orthokinetic aggregation driven by velocity gradients.
+The Brownian continuum kernel models perikinetic aggregation due to thermal motion. The Brownian free-molecular prefactor is supplied externally. The shear kernel models orthokinetic aggregation driven by velocity gradients.
 
 ---
 

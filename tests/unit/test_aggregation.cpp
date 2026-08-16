@@ -14,6 +14,7 @@
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 #include <numeric>
@@ -102,7 +103,8 @@ protected:
 
     pbe_cuda::AggregationParams make_params(pbe_cuda::AggregationKernel k,
                                              double b0   = 1.0e-17,
-                                             double b_br = 0.0,
+                                             double b_bc = 0.0,
+                                             double b_bfm = 0.0,
                                              double b_sh = 0.0) {
         pbe_cuda::AggregationParams p;
         p.n           = N;
@@ -110,7 +112,8 @@ protected:
         p.inv_log_r   = inv_log_r;
         p.kernel_type = k;
         p.beta0       = b0;
-        p.beta_br     = b_br;
+        p.beta_bc     = b_bc;
+        p.beta_bfm    = b_bfm;
         p.beta_sh     = b_sh;
         p.block_size  = 256;
         return p;
@@ -145,21 +148,38 @@ TEST_F(AggregationTest, SmokeProduct) {
     EXPECT_EQ(run(p), cudaSuccess);
 }
 
-TEST_F(AggregationTest, SmokeBrownian) {
+TEST_F(AggregationTest, SmokeBrownianContinuum) {
     N_host[N/2] = 1.0e14;
-    auto p = make_params(pbe_cuda::AggregationKernel::Brownian, 0.0, 1.0e-17, 0.0);
+    auto p = make_params(pbe_cuda::AggregationKernel::BrownianContinuum,
+                         0.0, 1.0e-17, 0.0, 0.0);
+    EXPECT_EQ(run(p), cudaSuccess);
+}
+
+TEST_F(AggregationTest, SmokeBrownianFreeMolecular) {
+    N_host[N/2] = 1.0e14;
+    auto p = make_params(pbe_cuda::AggregationKernel::BrownianFreeMolecular,
+                         0.0, 0.0, 1.0e-17, 0.0);
     EXPECT_EQ(run(p), cudaSuccess);
 }
 
 TEST_F(AggregationTest, SmokeShear) {
     N_host[N/2] = 1.0e14;
-    auto p = make_params(pbe_cuda::AggregationKernel::Shear, 0.0, 0.0, 1.0e-17);
+    auto p = make_params(pbe_cuda::AggregationKernel::Shear,
+                         0.0, 0.0, 0.0, 1.0e-17);
     EXPECT_EQ(run(p), cudaSuccess);
 }
 
-TEST_F(AggregationTest, SmokeBrownianShear) {
+TEST_F(AggregationTest, SmokeBrownianContinuumShear) {
     N_host[N/2] = 1.0e14;
-    auto p = make_params(pbe_cuda::AggregationKernel::BrownianShear, 0.0, 1.0e-17, 1.0e-17);
+    auto p = make_params(pbe_cuda::AggregationKernel::BrownianContinuumShear,
+                         0.0, 1.0e-17, 0.0, 1.0e-17);
+    EXPECT_EQ(run(p), cudaSuccess);
+}
+
+TEST_F(AggregationTest, SmokeBrownianFreeMolecularShear) {
+    N_host[N/2] = 1.0e14;
+    auto p = make_params(pbe_cuda::AggregationKernel::BrownianFreeMolecularShear,
+                         0.0, 0.0, 1.0e-17, 1.0e-17);
     EXPECT_EQ(run(p), cudaSuccess);
 }
 
@@ -171,11 +191,11 @@ TEST_F(AggregationTest, SmokeBrownianShear) {
 class AggregationConservationTest : public AggregationTest {
 protected:
     void check_volume_conservation(pbe_cuda::AggregationKernel k,
-                                double b0, double b_br, double b_sh) {
+                                double b0, double b_bc, double b_bfm, double b_sh) {
         for (int i = 0; i < N; ++i)
             N_host[i] = 1.0e12 * std::exp(-static_cast<double>(i) / 10.0);
 
-        auto p = make_params(k, b0, b_br, b_sh);
+        auto p = make_params(k, b0, b_bc, b_bfm, b_sh);
         ASSERT_EQ(run(p), cudaSuccess);
 
         double dM1  = 0.0;
@@ -202,32 +222,42 @@ protected:
 
 TEST_F(AggregationConservationTest, VolumeConservedConstant) {
     check_volume_conservation(pbe_cuda::AggregationKernel::Constant,
-                              1.0e-17, 0.0, 0.0);
+                              1.0e-17, 0.0, 0.0, 0.0);
 }
 
 TEST_F(AggregationConservationTest, VolumeConservedSum) {
     check_volume_conservation(pbe_cuda::AggregationKernel::Sum,
-                              1.0e-17, 0.0, 0.0);
+                              1.0e-17, 0.0, 0.0, 0.0);
 }
 
 TEST_F(AggregationConservationTest, VolumeConservedProduct) {
     check_volume_conservation(pbe_cuda::AggregationKernel::Product,
-                              1.0e-17, 0.0, 0.0);
+                              1.0e-17, 0.0, 0.0, 0.0);
 }
 
-TEST_F(AggregationConservationTest, VolumeConservedBrownian) {
-    check_volume_conservation(pbe_cuda::AggregationKernel::Brownian,
-                              0.0, 1.0e-17, 0.0);
+TEST_F(AggregationConservationTest, VolumeConservedBrownianContinuum) {
+    check_volume_conservation(pbe_cuda::AggregationKernel::BrownianContinuum,
+                              0.0, 1.0e-17, 0.0, 0.0);
+}
+
+TEST_F(AggregationConservationTest, VolumeConservedBrownianFreeMolecular) {
+    check_volume_conservation(pbe_cuda::AggregationKernel::BrownianFreeMolecular,
+                              0.0, 0.0, 1.0e-17, 0.0);
 }
 
 TEST_F(AggregationConservationTest, VolumeConservedShear) {
     check_volume_conservation(pbe_cuda::AggregationKernel::Shear,
-                              0.0, 0.0, 1.0e-17);
+                              0.0, 0.0, 0.0, 1.0e-17);
 }
 
-TEST_F(AggregationConservationTest, VolumeConservedBrownianShear) {
-    check_volume_conservation(pbe_cuda::AggregationKernel::BrownianShear,
-                              0.0, 1.0e-17, 1.0e-17);
+TEST_F(AggregationConservationTest, VolumeConservedBrownianContinuumShear) {
+    check_volume_conservation(pbe_cuda::AggregationKernel::BrownianContinuumShear,
+                              0.0, 1.0e-17, 0.0, 1.0e-17);
+}
+
+TEST_F(AggregationConservationTest, VolumeConservedBrownianFreeMolecularShear) {
+    check_volume_conservation(pbe_cuda::AggregationKernel::BrownianFreeMolecularShear,
+                              0.0, 0.0, 1.0e-17, 1.0e-17);
 }
 
 // ===========================================================================
@@ -263,6 +293,68 @@ TEST_F(AggregationTest, SelfCollisionDeathConstantKernel) {
     // only bin j is populated. So rhs[j] = death only.
     EXPECT_NEAR(rhs_host[j], expected_death, std::abs(expected_death) * 1.0e-10)
         << "Self-collision death term incorrect for bin " << j;
+}
+
+// Direct free-molecular Brownian check for a self-collision in bin 0.
+// With x[0]=v, N[0]=N and no other populated bins:
+//   beta = beta_bfm * (2*cbrt(v))^2 * sqrt(2/v)
+//   rhs[0] death = -beta*N^2
+//   birth        = 0.5*beta*N^2 redistributed to v_new=2v
+TEST_F(AggregationTest, BrownianFreeMolecularSelfCollisionReference) {
+    constexpr int    j        = 0;
+    constexpr double Nj       = 3.0e7;
+    constexpr double beta_bfm = 2.5e-9;
+
+    N_host[j] = Nj;
+    auto p = make_params(pbe_cuda::AggregationKernel::BrownianFreeMolecular,
+                         0.0, 0.0, beta_bfm, 0.0);
+    ASSERT_EQ(run(p), cudaSuccess);
+
+    const double rj = std::cbrt(x_host[j]);
+    const double s = rj + rj;
+    const double beta = beta_bfm * s * s * std::sqrt(1.0 / x_host[j] + 1.0 / x_host[j]);
+    const double rate = 0.5 * beta * Nj * Nj;
+
+    EXPECT_NEAR(rhs_host[j], -2.0 * rate, std::abs(2.0 * rate) * 1.0e-12);
+
+    const double v_new = 2.0 * x_host[j];
+    const double pos = (std::log(v_new) - log_x0) * inv_log_r;
+    const int hi = std::min(N - 1, std::max(1, static_cast<int>(std::floor(pos)) + 1));
+    const int lo = hi - 1;
+    const double w_upper = (v_new - x_host[lo]) / (x_host[hi] - x_host[lo]);
+    EXPECT_NEAR(rhs_host[lo], (1.0 - w_upper) * rate,
+                std::abs(rate) * 1.0e-12);
+    EXPECT_NEAR(rhs_host[hi], w_upper * rate,
+                std::abs(rate) * 1.0e-12);
+}
+
+TEST_F(AggregationTest, CpuCudaAgreeForBrownianAndShearKernels) {
+    for (int i = 0; i < N; ++i)
+        N_host[i] = 1.0e9 * std::exp(-static_cast<double>(i) / 12.0);
+
+    const pbe_cuda::AggregationKernel kernels[] = {
+        pbe_cuda::AggregationKernel::BrownianContinuum,
+        pbe_cuda::AggregationKernel::BrownianFreeMolecular,
+        pbe_cuda::AggregationKernel::Shear,
+        pbe_cuda::AggregationKernel::BrownianContinuumShear,
+        pbe_cuda::AggregationKernel::BrownianFreeMolecularShear
+    };
+
+    for (auto kernel : kernels) {
+        auto p = make_params(kernel, 0.0, 1.2e-8, 2.5e-9, 7.5e-10);
+        ASSERT_EQ(run(p), cudaSuccess);
+
+        std::vector<double> rhs_cpu(N, 0.0);
+        ASSERT_EQ(pbe_cuda::launch_aggregation_rhs_cpu(
+                      N_host.data(), x_host.data(), rhs_cpu.data(), p),
+                  cudaSuccess);
+
+        for (int i = 0; i < N; ++i) {
+            const double scale = std::max({1.0, std::abs(rhs_host[i]), std::abs(rhs_cpu[i])});
+            EXPECT_NEAR(rhs_host[i], rhs_cpu[i], 1.0e-10 * scale)
+                << "kernel=" << static_cast<int>(kernel) << " bin=" << i;
+        }
+    }
 }
 
 // Sum of RHS must be non-positive for pure aggregation

@@ -20,7 +20,8 @@ inline double eval_aggregation_kernel_cpu(AggregationKernel kernel,
                                           double xj,
                                           double xk,
                                           double beta0,
-                                          double beta_br,
+                                          double beta_bc,
+                                          double beta_bfm,
                                           double beta_sh)
 {
     switch (kernel) {
@@ -30,21 +31,34 @@ inline double eval_aggregation_kernel_cpu(AggregationKernel kernel,
             return beta0 * (xj + xk);
         case AggregationKernel::Product:
             return beta0 * xj * xk;
-        case AggregationKernel::Brownian: {
+        case AggregationKernel::BrownianContinuum: {
             const double xj3 = std::cbrt(xj);
             const double xk3 = std::cbrt(xk);
-            return beta_br * (xj3 / xk3 + xk3 / xj3 + 2.0);
+            return beta_bc * (xj3 / xk3 + xk3 / xj3 + 2.0);
+        }
+        case AggregationKernel::BrownianFreeMolecular: {
+            const double xj3 = std::cbrt(xj);
+            const double xk3 = std::cbrt(xk);
+            const double s = xj3 + xk3;
+            return beta_bfm * s * s * std::sqrt(1.0 / xj + 1.0 / xk);
         }
         case AggregationKernel::Shear: {
             const double s = std::cbrt(xj) + std::cbrt(xk);
             return beta_sh * s * s * s;
         }
-        case AggregationKernel::BrownianShear: {
+        case AggregationKernel::BrownianContinuumShear: {
             const double xj3 = std::cbrt(xj);
             const double xk3 = std::cbrt(xk);
-            const double br  = beta_br * (xj3 / xk3 + xk3 / xj3 + 2.0);
+            const double br  = beta_bc * (xj3 / xk3 + xk3 / xj3 + 2.0);
             const double s   = xj3 + xk3;
             return br + beta_sh * s * s * s;
+        }
+        case AggregationKernel::BrownianFreeMolecularShear: {
+            const double xj3 = std::cbrt(xj);
+            const double xk3 = std::cbrt(xk);
+            const double s = xj3 + xk3;
+            const double bfm = beta_bfm * s * s * std::sqrt(1.0 / xj + 1.0 / xk);
+            return bfm + beta_sh * s * s * s;
         }
     }
     return 0.0;
