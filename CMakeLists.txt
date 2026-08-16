@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.18)
 
+# Build with CUDA by default.  Set -DENABLE_CUDA=OFF to build a pure C++
+# serial CPU library with no CUDA toolkit, nvcc, CUDA sources, or cudart link.
+option(ENABLE_CUDA "Build with CUDA support" ON)
+
 # ── CUDA architecture — MUST be set before project() ─────────────────────────
 # CMake initialises CMAKE_CUDA_ARCHITECTURES during project(), so setting it
 # afterwards has no effect on the default.
 # Override at configure time with: cmake -DCMAKE_CUDA_ARCHITECTURES="80;86" ..
-if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+if(ENABLE_CUDA AND NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     # sm_80 = A100, A30
     # sm_86 = RTX 3090, A40, RTX 30xx
     # Both are Ampere but different compute capabilities —
@@ -13,11 +17,19 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
 endif()
 
 # ── Project definition ────────────────────────────────────────────────────────
-project(pbe_cuda
-    VERSION      1.0.0
-    DESCRIPTION  "Fast CUDA implementation of aggregation and breakage terms in PBE using the fixed pivot sectional method"
-    LANGUAGES    CXX CUDA
-)
+if(ENABLE_CUDA)
+    project(pbe_cuda
+        VERSION      1.0.0
+        DESCRIPTION  "Fast CUDA implementation of aggregation and breakage terms in PBE using the fixed pivot sectional method"
+        LANGUAGES    CXX CUDA
+    )
+else()
+    project(pbe_cuda
+        VERSION      1.0.0
+        DESCRIPTION  "Serial CPU implementation of aggregation and breakage terms in PBE using the fixed pivot sectional method"
+        LANGUAGES    CXX
+    )
+endif()
 
 # ── CMake modules & policies ──────────────────────────────────────────────────
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -27,8 +39,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)   # Generates compile_commands.json for cl
 set(CMAKE_CXX_STANDARD          20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS        OFF)
-set(CMAKE_CUDA_STANDARD         17)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+if(ENABLE_CUDA)
+    set(CMAKE_CUDA_STANDARD         17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+endif()
 
 # ── Build type default ────────────────────────────────────────────────────────
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -47,16 +61,24 @@ option(PBE_ENABLE_WARNINGS "Enable extra compiler warnings"            ON)
 
 # ── Library target(s) ─────────────────────────────────────────────────────────
 set(PBE_SOURCES
-    src/aggregation.cu
-    src/breakage.cu
-    src/utils.cu
+    src/aggregation_cpu.cpp
+    src/breakage_cpu.cpp
 )
 
 set(PBE_PUBLIC_HEADERS
     include/pbe_cuda/pbe_cuda.cuh
+    include/pbe_cuda/cuda_compat.cuh
     include/pbe_cuda/aggregation.cuh
     include/pbe_cuda/breakage.cuh
 )
+
+if(ENABLE_CUDA)
+    list(APPEND PBE_SOURCES
+        src/aggregation.cu
+        src/breakage.cu
+        src/utils.cu
+    )
+endif()
 
 # Helper function to configure common properties on a library target
 function(pbe_configure_target target_name)
@@ -66,24 +88,28 @@ function(pbe_configure_target target_name)
             $<INSTALL_INTERFACE:include>
     )
     set_target_properties(${target_name} PROPERTIES
-        CUDA_SEPARABLE_COMPILATION  ON
         POSITION_INDEPENDENT_CODE   ON
         VERSION                     ${PROJECT_VERSION}
         SOVERSION                   ${PROJECT_VERSION_MAJOR}
         PUBLIC_HEADER               "${PBE_PUBLIC_HEADERS}"
     )
-    # Explicitly pass compute capability to nvcc.
-    # This ensures double-precision atomicAdd (sm_60+) is visible and that
-    # PTX/SASS is generated for the correct target architecture.
-    target_compile_options(${target_name} PRIVATE
-        $<$<COMPILE_LANGUAGE:CUDA>:
-            --generate-code arch=compute_86,code=sm_86>
+    target_compile_definitions(${target_name}
+        PUBLIC $<$<BOOL:${ENABLE_CUDA}>:PBE_ENABLE_CUDA>
     )
+    if(ENABLE_CUDA)
+        set_target_properties(${target_name} PROPERTIES
+            CUDA_SEPARABLE_COMPILATION ON
+        )
+    endif()
     if(PBE_ENABLE_WARNINGS)
         target_compile_options(${target_name} PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:  -Wall -Wextra -Wpedantic>
-            $<$<COMPILE_LANGUAGE:CUDA>: -Xcompiler=-Wall,-Wextra>
         )
+        if(ENABLE_CUDA)
+            target_compile_options(${target_name} PRIVATE
+                $<$<COMPILE_LANGUAGE:CUDA>: -Xcompiler=-Wall,-Wextra>
+            )
+        endif()
     endif()
 endfunction()
 
@@ -119,12 +145,16 @@ target_include_directories(pbe_examples_common INTERFACE
 
 # ── Sub-directories ───────────────────────────────────────────────────────────
 if(PBE_BUILD_EXAMPLES)
-    add_subdirectory(examples/aggregation_constant)
-    add_subdirectory(examples/aggregation_sum)
-    add_subdirectory(examples/aggregation_product)
-    add_subdirectory(examples/breakage_linear_uniform)
-    add_subdirectory(examples/breakage_linear_symmetricbinary)
-    add_subdirectory(examples/flocculation_two_stage)
+    if(ENABLE_CUDA)
+        add_subdirectory(examples/aggregation_constant)
+        add_subdirectory(examples/aggregation_sum)
+        add_subdirectory(examples/aggregation_product)
+        add_subdirectory(examples/breakage_linear_uniform)
+        add_subdirectory(examples/breakage_linear_symmetricbinary)
+        add_subdirectory(examples/flocculation_two_stage)
+    else()
+        message(STATUS "pbe_cuda: examples are skipped when ENABLE_CUDA=OFF")
+    endif()
 endif()
 
 if(PBE_BUILD_TESTS)

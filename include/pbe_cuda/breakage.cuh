@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include <cuda_runtime.h>
+#include "pbe_cuda/cuda_compat.cuh"
 
 namespace pbe_cuda {
 
@@ -127,5 +127,15 @@ cudaError_t launch_breakage_rhs(
     double*                rhs,
     const BreakageParams&  params,
     cudaStream_t           stream = 0);
+
+// Serial host-memory implementation.  This is always available and is used by
+// launch_breakage_rhs() automatically when the library is built without CUDA.
+cudaError_t launch_breakage_rhs_cpu(
+    const double*          N,
+    const double*          x,
+    const double*          t_q,
+    const double*          bw_q,
+    double*                rhs,
+    const BreakageParams&  params);
 
 } // namespace pbe_cuda

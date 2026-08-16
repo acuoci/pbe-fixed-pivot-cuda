@@ -78,12 +78,28 @@ cmake --build . -j$(nproc)
 
 | CMake option | Default | Description |
 |---|---|---|
+| `ENABLE_CUDA` | ON | Build CUDA kernels and examples. Set OFF for a pure serial CPU build with no CUDA toolkit or GPU required |
 | `PBE_BUILD_STATIC` | ON | Build static library (`libpbe_cuda.a`) |
 | `PBE_BUILD_SHARED` | OFF | Build shared library (`libpbe_cuda.so`) |
 | `PBE_BUILD_EXAMPLES` | ON | Build worked examples |
 | `PBE_BUILD_TESTS` | ON | Build unit/regression tests |
 | `PBE_ENABLE_WARNINGS` | ON | Enable extra compiler warnings |
 | `CMAKE_CUDA_ARCHITECTURES` | `80 86` | Target GPU architectures (override for your hardware) |
+
+### CPU-only build
+
+The library can also be built as a pure serial C++ implementation:
+
+```bash
+cmake -S . -B build-cpu \
+    -DENABLE_CUDA=OFF \
+    -DPBE_BUILD_TESTS=ON
+
+cmake --build build-cpu -j$(nproc)
+ctest --test-dir build-cpu --output-on-failure -V
+```
+
+In this mode no CUDA toolkit, `nvcc`, CUDA runtime, or GPU is required. CUDA examples are skipped, and `launch_aggregation_rhs()` / `launch_breakage_rhs()` operate on host memory by forwarding to the serial CPU implementations. The explicit host-memory entry points `launch_aggregation_rhs_cpu()` and `launch_breakage_rhs_cpu()` are always available, including in CUDA builds for side-by-side comparisons.
 
 ---
 

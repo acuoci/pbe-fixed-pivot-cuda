@@ -20,7 +20,9 @@
 #   ctest --test-dir build --output-on-failure -V
 # =============================================================================
 
-find_package(CUDAToolkit REQUIRED)
+if(ENABLE_CUDA)
+    find_package(CUDAToolkit REQUIRED)
+endif()
 
 # ── GoogleTest: system install or FetchContent fallback ───────────────────────
 if(DEFINED GTEST_ROOT OR DEFINED ENV{GTEST_ROOT})
@@ -59,9 +61,11 @@ macro(pbe_add_test target source)
     target_link_libraries(${target}
         PRIVATE
             pbe_cuda::pbe_cuda
-            CUDA::cudart
             GTest::gtest_main
     )
+    if(ENABLE_CUDA)
+        target_link_libraries(${target} PRIVATE CUDA::cudart)
+    endif()
     set_target_properties(${target} PROPERTIES
         CXX_STANDARD          17
         CXX_STANDARD_REQUIRED ON
@@ -70,5 +74,9 @@ macro(pbe_add_test target source)
     gtest_discover_tests(${target})
 endmacro()
 
-pbe_add_test(test_aggregation unit/test_aggregation.cpp)
-pbe_add_test(test_breakage    unit/test_breakage.cpp)
+pbe_add_test(test_cpu_rhs unit/test_cpu_rhs.cpp)
+
+if(ENABLE_CUDA)
+    pbe_add_test(test_aggregation unit/test_aggregation.cpp)
+    pbe_add_test(test_breakage    unit/test_breakage.cpp)
+endif()
