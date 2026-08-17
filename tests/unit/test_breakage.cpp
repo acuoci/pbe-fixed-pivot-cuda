@@ -14,6 +14,7 @@
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 #include <numeric>
@@ -285,6 +286,35 @@ TEST_F(BreakageTest, ThresholdSuppressesBelowVmin) {
     for (int i = 0; i < threshold_bin; ++i)
         EXPECT_GE(rhs_host[i], 0.0)
             << "Bin " << i << " below threshold has negative rhs (unexpected death)";
+}
+
+TEST_F(BreakageTest, CpuCudaAgreeForAllSelectionFunctions) {
+    for (int i = 0; i < N; ++i)
+        N_host[i] = 1.0e9 * std::exp(-static_cast<double>(i) / 12.0);
+
+    const pbe_cuda::BreakageParams cases[] = {
+        make_params(pbe_cuda::BreakageSelection::Constant, 1.3e-3),
+        make_params(pbe_cuda::BreakageSelection::Linear, 1.3e-3, x_host[N/2]),
+        make_params(pbe_cuda::BreakageSelection::PowerLaw, 1.3e-3, x_host[N/2], 1.7),
+        make_params(pbe_cuda::BreakageSelection::Threshold, 1.3e-3, 1.0, 1.0, x_host[N/3])
+    };
+
+    for (auto p : cases) {
+        ASSERT_EQ(run(p), cudaSuccess);
+
+        std::vector<double> rhs_cpu(N, 0.0);
+        ASSERT_EQ(pbe_cuda::launch_breakage_rhs_cpu(
+                      N_host.data(), x_host.data(),
+                      t_q_host.data(), bw_q_host.data(),
+                      rhs_cpu.data(), p),
+                  cudaSuccess);
+
+        for (int i = 0; i < N; ++i) {
+            const double scale = std::max({1.0, std::abs(rhs_host[i]), std::abs(rhs_cpu[i])});
+            EXPECT_NEAR(rhs_host[i], rhs_cpu[i], 1.0e-10 * scale)
+                << "selection=" << static_cast<int>(p.selection) << " bin=" << i;
+        }
+    }
 }
 
 // Invalid parameters must return error.

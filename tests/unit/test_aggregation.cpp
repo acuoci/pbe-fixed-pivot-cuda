@@ -328,11 +328,14 @@ TEST_F(AggregationTest, BrownianFreeMolecularSelfCollisionReference) {
                 std::abs(rate) * 1.0e-12);
 }
 
-TEST_F(AggregationTest, CpuCudaAgreeForBrownianAndShearKernels) {
+TEST_F(AggregationTest, CpuCudaAgreeForAllAggregationKernels) {
     for (int i = 0; i < N; ++i)
         N_host[i] = 1.0e9 * std::exp(-static_cast<double>(i) / 12.0);
 
     const pbe_cuda::AggregationKernel kernels[] = {
+        pbe_cuda::AggregationKernel::Constant,
+        pbe_cuda::AggregationKernel::Sum,
+        pbe_cuda::AggregationKernel::Product,
         pbe_cuda::AggregationKernel::BrownianContinuum,
         pbe_cuda::AggregationKernel::BrownianFreeMolecular,
         pbe_cuda::AggregationKernel::Shear,

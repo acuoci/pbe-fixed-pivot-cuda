@@ -286,6 +286,94 @@ TEST(CpuAggregation, BrownianAndShearVariantsConserveVolume)
     }
 }
 
+TEST(CpuAggregation, KernelFormulaSelfCollisionReferences)
+{
+    const std::vector<double> x = {1.0, 2.0, 4.0};
+    const std::vector<double> N = {3.0, 0.0, 0.0};
+
+    struct Case {
+        pbe_cuda::AggregationKernel kernel;
+        double beta0;
+        double beta_bc;
+        double beta_bfm;
+        double beta_sh;
+        double expected_beta;
+    };
+
+    const double xi = x[0];
+    const double ri = std::cbrt(xi);
+    const double s = ri + ri;
+    const Case cases[] = {
+        {pbe_cuda::AggregationKernel::Constant,
+         2.0, 0.0, 0.0, 0.0, 2.0},
+        {pbe_cuda::AggregationKernel::Sum,
+         2.0, 0.0, 0.0, 0.0, 2.0 * (xi + xi)},
+        {pbe_cuda::AggregationKernel::Product,
+         2.0, 0.0, 0.0, 0.0, 2.0 * xi * xi},
+        {pbe_cuda::AggregationKernel::BrownianContinuum,
+         0.0, 2.0, 0.0, 0.0, 2.0 * (ri / ri + ri / ri + 2.0)},
+        {pbe_cuda::AggregationKernel::BrownianFreeMolecular,
+         0.0, 0.0, 2.0, 0.0, 2.0 * s * s * std::sqrt(1.0 / xi + 1.0 / xi)},
+        {pbe_cuda::AggregationKernel::Shear,
+         0.0, 0.0, 0.0, 2.0, 2.0 * s * s * s},
+        {pbe_cuda::AggregationKernel::BrownianContinuumShear,
+         0.0, 2.0, 0.0, 3.0,
+         2.0 * (ri / ri + ri / ri + 2.0) + 3.0 * s * s * s},
+        {pbe_cuda::AggregationKernel::BrownianFreeMolecularShear,
+         0.0, 0.0, 2.0, 3.0,
+         2.0 * s * s * std::sqrt(1.0 / xi + 1.0 / xi) + 3.0 * s * s * s}
+    };
+
+    for (const auto& c : cases) {
+        std::vector<double> rhs(3, 0.0);
+        pbe_cuda::AggregationParams params;
+        params.n = static_cast<int>(x.size());
+        params.log_x0 = std::log(x[0]);
+        params.inv_log_r = 1.0 / std::log(x[1] / x[0]);
+        params.kernel_type = c.kernel;
+        params.beta0 = c.beta0;
+        params.beta_bc = c.beta_bc;
+        params.beta_bfm = c.beta_bfm;
+        params.beta_sh = c.beta_sh;
+
+        ASSERT_EQ(pbe_cuda::launch_aggregation_rhs_cpu(
+                      N.data(), x.data(), rhs.data(), params),
+                  cudaSuccess);
+
+        const double rate = 0.5 * c.expected_beta * N[0] * N[0];
+        EXPECT_NEAR(rhs[0], -2.0 * rate, std::abs(rate) * 1.0e-12)
+            << "kernel=" << static_cast<int>(c.kernel);
+        EXPECT_NEAR(rhs[1], rate, std::abs(rate) * 1.0e-12)
+            << "kernel=" << static_cast<int>(c.kernel);
+        EXPECT_DOUBLE_EQ(rhs[2], 0.0)
+            << "kernel=" << static_cast<int>(c.kernel);
+    }
+}
+
+TEST(CpuAggregation, FixedPivotInterpolatedBirthReference)
+{
+    const std::vector<double> x = {1.0, 3.0, 10.0};
+    const std::vector<double> N = {4.0, 0.0, 0.0};
+    std::vector<double> rhs(3, 0.0);
+
+    pbe_cuda::AggregationParams params;
+    params.n = static_cast<int>(x.size());
+    params.inv_log_r = 0.0;  // exercise generic-grid binary search path
+    params.kernel_type = pbe_cuda::AggregationKernel::Constant;
+    params.beta0 = 2.0;
+
+    ASSERT_EQ(pbe_cuda::launch_aggregation_rhs_cpu(
+                  N.data(), x.data(), rhs.data(), params),
+              cudaSuccess);
+
+    const double rate = 0.5 * params.beta0 * N[0] * N[0];
+    const double w_upper = (2.0 * x[0] - x[0]) / (x[1] - x[0]);
+
+    EXPECT_DOUBLE_EQ(rhs[0], -2.0 * rate + (1.0 - w_upper) * rate);
+    EXPECT_DOUBLE_EQ(rhs[1], w_upper * rate);
+    EXPECT_DOUBLE_EQ(rhs[2], 0.0);
+}
+
 TEST(CpuAggregation, BrownianFreeMolecularSelfCollisionReference)
 {
     const std::vector<double> x = {1.0, 2.0, 4.0};
@@ -311,6 +399,90 @@ TEST(CpuAggregation, BrownianFreeMolecularSelfCollisionReference)
 
     EXPECT_DOUBLE_EQ(rhs[0], -2.0 * rate);
     EXPECT_DOUBLE_EQ(rhs[1], rate);
+    EXPECT_DOUBLE_EQ(rhs[2], 0.0);
+}
+
+TEST(CpuBreakage, SelectionFormulaReferences)
+{
+    const std::vector<double> x = {1.0, 2.0, 4.0, 8.0};
+    const std::vector<double> N = {0.0, 0.0, 0.0, 5.0};
+    const std::vector<double> t_q = {0.5};
+    const std::vector<double> bw_q = {2.0};
+
+    struct Case {
+        pbe_cuda::BreakageSelection selection;
+        double S0;
+        double v_ref;
+        double alpha;
+        double v_min;
+        double expected_S;
+    };
+
+    const Case cases[] = {
+        {pbe_cuda::BreakageSelection::Constant, 3.0, 1.0, 1.0, 0.0, 3.0},
+        {pbe_cuda::BreakageSelection::Linear, 3.0, 4.0, 1.0, 0.0, 3.0 * x[3] / 4.0},
+        {pbe_cuda::BreakageSelection::PowerLaw, 3.0, 4.0, 2.0, 0.0,
+         3.0 * std::pow(x[3] / 4.0, 2.0)},
+        {pbe_cuda::BreakageSelection::Threshold, 3.0, 1.0, 1.0, 4.0, 3.0},
+        {pbe_cuda::BreakageSelection::Threshold, 3.0, 1.0, 1.0, 10.0, 0.0}
+    };
+
+    for (const auto& c : cases) {
+        std::vector<double> rhs(4, 0.0);
+        pbe_cuda::BreakageParams params;
+        params.n = static_cast<int>(x.size());
+        params.n_quad = static_cast<int>(t_q.size());
+        params.selection = c.selection;
+        params.S0 = c.S0;
+        params.v_ref = c.v_ref;
+        params.alpha = c.alpha;
+        params.v_min = c.v_min;
+
+        ASSERT_EQ(pbe_cuda::launch_breakage_rhs_cpu(
+                      N.data(), x.data(), t_q.data(), bw_q.data(),
+                      rhs.data(), params),
+                  cudaSuccess);
+
+        const double death = c.expected_S * N[3];
+        const double birth = c.expected_S * N[3] * bw_q[0];
+
+        EXPECT_DOUBLE_EQ(rhs[0], 0.0)
+            << "selection=" << static_cast<int>(c.selection);
+        EXPECT_DOUBLE_EQ(rhs[1], 0.0)
+            << "selection=" << static_cast<int>(c.selection);
+        EXPECT_DOUBLE_EQ(rhs[2], birth)
+            << "selection=" << static_cast<int>(c.selection);
+        EXPECT_DOUBLE_EQ(rhs[3], -death)
+            << "selection=" << static_cast<int>(c.selection);
+    }
+}
+
+TEST(CpuBreakage, FixedPivotInterpolatedBirthReference)
+{
+    const std::vector<double> x = {1.0, 3.0, 10.0};
+    const std::vector<double> N = {0.0, 5.0, 0.0};
+    const std::vector<double> t_q = {0.5};
+    const std::vector<double> bw_q = {2.0};
+    std::vector<double> rhs(3, 0.0);
+
+    pbe_cuda::BreakageParams params;
+    params.n = static_cast<int>(x.size());
+    params.n_quad = static_cast<int>(t_q.size());
+    params.selection = pbe_cuda::BreakageSelection::Constant;
+    params.S0 = 2.0;
+
+    ASSERT_EQ(pbe_cuda::launch_breakage_rhs_cpu(
+                  N.data(), x.data(), t_q.data(), bw_q.data(),
+                  rhs.data(), params),
+              cudaSuccess);
+
+    const double death = params.S0 * N[1];
+    const double birth = params.S0 * N[1] * bw_q[0];
+    const double v_frag = x[1] * t_q[0];
+    const double w_upper = (v_frag - x[0]) / (x[1] - x[0]);
+
+    EXPECT_DOUBLE_EQ(rhs[0], (1.0 - w_upper) * birth);
+    EXPECT_DOUBLE_EQ(rhs[1], -death + w_upper * birth);
     EXPECT_DOUBLE_EQ(rhs[2], 0.0);
 }
 

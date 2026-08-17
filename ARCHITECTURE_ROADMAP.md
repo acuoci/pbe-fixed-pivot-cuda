@@ -227,7 +227,7 @@ well-defined numerical tolerances and document the expected error scale.
 - **API implications:** None.
 - **Main risks:** Existing boundary-clipping behavior must be documented rather
   than accidentally changed.
-- **Status:** Not started.
+- **Status:** Completed.
 
 ### Phase 2: Lightweight Array Views
 
@@ -428,3 +428,4 @@ new process contributions while preserving process-specific numerical algorithms
 |---|---|
 | 2026-08-17 | Initial architecture roadmap created. |
 | 2026-08-17 | Completed Phase 0: project C++ standard policy aligned to C++17. |
+| 2026-08-17 | Completed Phase 1: added baseline formula, fixed-pivot reference, and CPU/CUDA agreement regression tests. |
