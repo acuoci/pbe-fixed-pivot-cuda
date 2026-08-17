@@ -63,6 +63,7 @@ option(PBE_ENABLE_WARNINGS "Enable extra compiler warnings"            ON)
 set(PBE_SOURCES
     src/aggregation_cpu.cpp
     src/breakage_cpu.cpp
+    src/sectional_grid.cpp
 )
 
 set(PBE_PUBLIC_HEADERS
@@ -71,6 +72,7 @@ set(PBE_PUBLIC_HEADERS
     include/pbe_cuda/cuda_compat.cuh
     include/pbe_cuda/aggregation.cuh
     include/pbe_cuda/breakage.cuh
+    include/pbe_cuda/sectional_grid.hpp
 )
 
 if(ENABLE_CUDA)
