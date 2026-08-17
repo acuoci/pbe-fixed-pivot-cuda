@@ -263,7 +263,7 @@ well-defined numerical tolerances and document the expected error scale.
   agreement.
 - **API implications:** None publicly.
 - **Main risks:** Small bracket differences can perturb results.
-- **Status:** Not started.
+- **Status:** Completed.
 
 ### Phase 5: Configuration vs Evaluation Conditions
 
@@ -431,3 +431,4 @@ new process contributions while preserving process-specific numerical algorithms
 | 2026-08-17 | Completed Phase 1: added baseline formula, fixed-pivot reference, and CPU/CUDA agreement regression tests. |
 | 2026-08-17 | Completed Phase 2: added lightweight C++17 `ArrayView` and construction/behavior tests without changing raw-pointer launch APIs. |
 | 2026-08-17 | Completed Phase 3: added validated host `SectionalGrid` with owned pivots, geometric metadata, grid views, and tests while preserving raw-pointer launch APIs. |
+| 2026-08-17 | Completed Phase 4: extracted shared fixed-pivot bracket and birth-allocation helpers for CPU/CUDA paths with direct utility tests and unchanged RHS launch APIs. |

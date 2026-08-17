@@ -8,7 +8,7 @@
 // Contents:
 //   - eval_selection_t<FLAG>  : templated selection function evaluators
 //   - dispatch_selection()    : runtime dispatcher (uniform branch)
-//   - bin_search()            : O(log n) binary search for birth bracket
+//   - fixed-pivot helpers     : O(log n) birth lookup and interpolation
 //   - breakage_death_kernel   : death term (one thread per bin, no atomics)
 //   - breakage_birth_kernel   : birth term (tiled shared-memory accumulation)
 // =============================================================================
@@ -17,6 +17,8 @@
 
 #include <cuda_runtime.h>
 #include <math.h>
+
+#include "pbe_cuda/detail/fixed_pivot.cuh"
 
 namespace pbe_cuda {
 namespace detail  {
@@ -78,30 +80,6 @@ __device__ __forceinline__ double dispatch_selection(
         case 3: return eval_selection_t<3>(v, S0, v_ref, alpha, v_min);
         default: return 0.0;
     }
-}
-
-// ---------------------------------------------------------------------------
-// Binary search — returns LEFT bracket index lo such that:
-//   x[lo] <= v < x[lo+1],   lo in [0, n-2].
-//
-// Convention note: aggregation_kernels.cuh::bin_index() returns the RIGHT
-// bracket (hi). Here we return the LEFT bracket (lo) and let the caller
-// derive hi = lo + 1 explicitly. Both conventions produce identical
-// interpolation results; the difference is intentional and documented to
-// avoid confusion during maintenance.
-//
-// Precondition: x[0] < v < x[n-1]  (boundary clips handled by caller).
-// ---------------------------------------------------------------------------
-__device__ __forceinline__ int bin_search(
-    const double* __restrict__ x, int n, double v)
-{
-    int lo = 0, hi = n - 1;
-    while (hi - lo > 1) {
-        int mid = (lo + hi) >> 1;
-        if (x[mid] <= v) lo = mid;
-        else             hi = mid;
-    }
-    return lo;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,22 +175,11 @@ __global__ void breakage_birth_kernel(
             contrib = Sj * Nj * bwq;
 
             double v_frag = xj * tq;
-
-            if (v_frag <= __ldg(&x[0])) {
-                birth_lo = 0;
-                birth_hi = -1;
-            } else if (v_frag >= __ldg(&x[n - 1])) {
-                birth_lo = n - 1;
-                birth_hi = -1;
-            } else {
-                int lo     = bin_search(x, n, v_frag);
-                int hi     = lo + 1;
-                double xlo = __ldg(&x[lo]);
-                double xhi = __ldg(&x[hi]);
-                eta_u      = (v_frag - xlo) / (xhi - xlo);
-                birth_lo   = lo;
-                birth_hi   = hi;
-            }
+            FixedPivotBirthAllocation birth =
+                fixed_pivot_birth_allocation(x, n, v_frag);
+            birth_lo = birth.lower;
+            birth_hi = birth.upper;
+            eta_u = birth.upper_weight;
         }
     }
 

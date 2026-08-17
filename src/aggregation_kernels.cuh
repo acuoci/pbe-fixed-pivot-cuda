@@ -8,7 +8,7 @@
 // Contents:
 //   - eval_kernel_t<FLAG>   : templated aggregation kernel evaluators
 //   - dispatch_kernel()     : runtime dispatcher (uniform branch, no divergence)
-//   - bin_index()           : O(1) geometric / O(log n) generic bin lookup
+//   - fixed-pivot helpers   : O(1) geometric / O(log n) generic birth lookup
 //   - aggregation_rhs<FLAG> : tiled shared-memory CUDA kernel
 // =============================================================================
 
@@ -18,6 +18,8 @@
 #include <cuda_runtime_api.h>
 #include <sm_60_atomic_functions.h>   // double atomicAdd — requires sm_60+
 #include <math.h>
+
+#include "pbe_cuda/detail/fixed_pivot.cuh"
 
 namespace pbe_cuda {
 namespace detail  {
@@ -129,33 +131,6 @@ __device__ inline double dispatch_kernel(double xj, double xk,
 }
 
 // ---------------------------------------------------------------------------
-// Birth bin lookup — supports both geometric and generic grids.
-//
-//   inv_log_r != 0  →  geometric grid: O(1) formula-based lookup
-//   inv_log_r == 0  →  generic grid:   O(log n) binary search
-//
-// Precondition: v_new must be strictly interior to (x[0], x[n-1]).
-//               Boundary clips are resolved before this is called.
-// ---------------------------------------------------------------------------
-__device__ inline int bin_index(const double* x, int n, double v_new,
-                                 double log_x0, double inv_log_r)
-{
-    if (inv_log_r != 0.0) {
-        double pos = (log(v_new) - log_x0) * inv_log_r;
-        int hi = static_cast<int>(floor(pos)) + 1;
-        return min(n - 1, max(1, hi));
-    } else {
-        int lo = 0, hi = n - 1;
-        while (hi - lo > 1) {
-            int mid = (lo + hi) / 2;
-            if (x[mid] <= v_new) lo = mid;
-            else                 hi = mid;
-        }
-        return hi;
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Tiled aggregation RHS kernel — templated on kernel FLAG.
 //
 // Each thread handles one (j,k) pair from the upper triangle (j <= k).
@@ -211,16 +186,11 @@ __global__ void aggregation_rhs_kernel(
             if (diagonal) rate *= 0.5;
 
             double v_new = xj + xk;
-            if (v_new >= __ldg(&x[n - 1])) {
-                birth_lo = n - 1; birth_hi = -1;
-            } else if (v_new <= __ldg(&x[0])) {
-                birth_lo = 0;     birth_hi = -1;
-            } else {
-                int hi  = bin_index(x, n, v_new, log_x0, inv_log_r);
-                int lo  = hi - 1;
-                w_upper = (v_new - __ldg(&x[lo])) / (__ldg(&x[hi]) - __ldg(&x[lo]));
-                birth_lo = lo; birth_hi = hi;
-            }
+            FixedPivotBirthAllocation birth =
+                fixed_pivot_birth_allocation(x, n, v_new, log_x0, inv_log_r);
+            birth_lo = birth.lower;
+            birth_hi = birth.upper;
+            w_upper = birth.upper_weight;
         }
     }
 

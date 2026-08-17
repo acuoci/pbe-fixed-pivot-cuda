@@ -9,8 +9,8 @@
 
 #include "pbe_cuda/aggregation.cuh"
 #include "pbe_cuda/breakage.cuh"
+#include "pbe_cuda/detail/fixed_pivot.cuh"
 
-#include <algorithm>
 #include <cmath>
 
 namespace pbe_cuda {
@@ -84,40 +84,6 @@ inline double eval_breakage_selection_cpu(BreakageSelection selection,
     return 0.0;
 }
 
-inline int fixed_pivot_hi_index_cpu(const double* x,
-                                    int n,
-                                    double v,
-                                    double log_x0,
-                                    double inv_log_r)
-{
-    if (inv_log_r != 0.0) {
-        const double pos = (std::log(v) - log_x0) * inv_log_r;
-        const int hi = static_cast<int>(std::floor(pos)) + 1;
-        return std::min(n - 1, std::max(1, hi));
-    }
-
-    int lo = 0;
-    int hi = n - 1;
-    while (hi - lo > 1) {
-        const int mid = (lo + hi) / 2;
-        if (x[mid] <= v) lo = mid;
-        else             hi = mid;
-    }
-    return hi;
-}
-
-inline int fixed_pivot_lo_index_cpu(const double* x, int n, double v)
-{
-    int lo = 0;
-    int hi = n - 1;
-    while (hi - lo > 1) {
-        const int mid = (lo + hi) / 2;
-        if (x[mid] <= v) lo = mid;
-        else             hi = mid;
-    }
-    return lo;
-}
-
 inline void add_fixed_pivot_birth_cpu(double* rhs,
                                       const double* x,
                                       int n,
@@ -126,16 +92,14 @@ inline void add_fixed_pivot_birth_cpu(double* rhs,
                                       double log_x0,
                                       double inv_log_r)
 {
-    if (v >= x[n - 1]) {
-        rhs[n - 1] += amount;
-    } else if (v <= x[0]) {
-        rhs[0] += amount;
+    const FixedPivotBirthAllocation allocation =
+        fixed_pivot_birth_allocation(x, n, v, log_x0, inv_log_r);
+
+    if (allocation.upper < 0) {
+        rhs[allocation.lower] += amount;
     } else {
-        const int hi = fixed_pivot_hi_index_cpu(x, n, v, log_x0, inv_log_r);
-        const int lo = hi - 1;
-        const double w_upper = (v - x[lo]) / (x[hi] - x[lo]);
-        rhs[lo] += (1.0 - w_upper) * amount;
-        rhs[hi] += w_upper * amount;
+        rhs[allocation.lower] += (1.0 - allocation.upper_weight) * amount;
+        rhs[allocation.upper] += allocation.upper_weight * amount;
     }
 }
 
@@ -145,16 +109,14 @@ inline void add_fixed_pivot_birth_cpu(double* rhs,
                                       double v,
                                       double amount)
 {
-    if (v <= x[0]) {
-        rhs[0] += amount;
-    } else if (v >= x[n - 1]) {
-        rhs[n - 1] += amount;
+    const FixedPivotBirthAllocation allocation =
+        fixed_pivot_birth_allocation(x, n, v);
+
+    if (allocation.upper < 0) {
+        rhs[allocation.lower] += amount;
     } else {
-        const int lo = fixed_pivot_lo_index_cpu(x, n, v);
-        const int hi = lo + 1;
-        const double eta_u = (v - x[lo]) / (x[hi] - x[lo]);
-        rhs[lo] += (1.0 - eta_u) * amount;
-        rhs[hi] += eta_u * amount;
+        rhs[allocation.lower] += (1.0 - allocation.upper_weight) * amount;
+        rhs[allocation.upper] += allocation.upper_weight * amount;
     }
 }
 
