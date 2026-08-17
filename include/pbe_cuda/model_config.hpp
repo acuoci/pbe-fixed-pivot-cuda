@@ -8,6 +8,7 @@
 #pragma once
 
 #include "pbe_cuda/aggregation_model.hpp"
+#include "pbe_cuda/breakage_model.hpp"
 #include "pbe_cuda/sectional_grid.hpp"
 
 #include <cmath>
@@ -78,6 +79,7 @@ private:
 struct PBEModelConfig {
     std::optional<SectionalGrid> grid;
     std::optional<AggregationModel> aggregation_model;
+    std::optional<BreakageModel> breakage_model;
     bool aggregation_enabled = false;
     bool breakage_enabled = false;
 
@@ -85,7 +87,8 @@ struct PBEModelConfig {
 
     [[nodiscard]] bool has_enabled_process() const noexcept
     {
-        return aggregation_enabled || aggregation_model || breakage_enabled;
+        return aggregation_enabled || aggregation_model ||
+               breakage_enabled || breakage_model;
     }
 
     void validate() const
@@ -94,6 +97,8 @@ struct PBEModelConfig {
             throw std::invalid_argument("PBEModelConfig: grid is required");
         if (aggregation_model)
             aggregation_model->validate();
+        if (breakage_model)
+            breakage_model->validate();
         if (!has_enabled_process())
             throw std::invalid_argument(
                 "PBEModelConfig: at least one process must be enabled");

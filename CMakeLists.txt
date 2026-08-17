@@ -73,6 +73,7 @@ set(PBE_PUBLIC_HEADERS
     include/pbe_cuda/aggregation.cuh
     include/pbe_cuda/aggregation_model.hpp
     include/pbe_cuda/breakage.cuh
+    include/pbe_cuda/breakage_model.hpp
     include/pbe_cuda/model_config.hpp
     include/pbe_cuda/sectional_grid.hpp
 )

@@ -76,6 +76,7 @@ endmacro()
 
 pbe_add_test(test_array_view unit/test_array_view.cpp)
 pbe_add_test(test_aggregation_model unit/test_aggregation_model.cpp)
+pbe_add_test(test_breakage_model unit/test_breakage_model.cpp)
 pbe_add_test(test_fixed_pivot unit/test_fixed_pivot.cpp)
 pbe_add_test(test_model_config unit/test_model_config.cpp)
 pbe_add_test(test_sectional_grid unit/test_sectional_grid.cpp)
