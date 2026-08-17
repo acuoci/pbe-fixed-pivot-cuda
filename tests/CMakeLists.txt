@@ -86,6 +86,7 @@ pbe_add_test(test_cpu_rhs unit/test_cpu_rhs.cpp)
 
 if(ENABLE_CUDA)
     pbe_add_test(test_cuda_backend unit/test_cuda_backend.cpp)
+    pbe_add_test(test_cuda_pbe_model unit/test_cuda_pbe_model.cpp)
     pbe_add_test(test_aggregation unit/test_aggregation.cpp)
     pbe_add_test(test_breakage    unit/test_breakage.cpp)
 endif()
