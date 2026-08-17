@@ -57,6 +57,7 @@ option(PBE_BUILD_SHARED    "Build pbe_cuda as a shared library (.so)" OFF)
 option(PBE_BUILD_STATIC    "Build pbe_cuda as a static library (.a)"  ON)
 option(PBE_BUILD_EXAMPLES  "Build the worked examples"                 ON)
 option(PBE_BUILD_TESTS     "Build the unit/regression tests"           ON)
+option(PBE_BUILD_BENCHMARKS "Build optional performance benchmarks"    OFF)
 option(PBE_ENABLE_WARNINGS "Enable extra compiler warnings"            ON)
 
 # ── Library target(s) ─────────────────────────────────────────────────────────
@@ -169,6 +170,10 @@ endif()
 if(PBE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+if(PBE_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
 endif()
 
 # ── Installation rules ────────────────────────────────────────────────────────

@@ -377,7 +377,10 @@ well-defined numerical tolerances and document the expected error scale.
 - **Required tests:** Full CTest matrix; example builds.
 - **API implications:** None intended.
 - **Main risks:** CMake churn.
-- **Status:** Not started.
+- **Status:** In progress. Core, examples, tests, verification, and benchmark
+  areas now have explicit layout/CMake separation with labeled test slices.
+  CPU-only CTest is verified; CUDA/example build validation awaits nvcc/CUDA
+  Toolkit availability.
 
 ### Phase 14: Future Process Interface
 
@@ -446,3 +449,4 @@ new process contributions while preserving process-specific numerical algorithms
 | 2026-08-17 | Implemented Phase 10 CUDA `CudaPBEModel` wrapper and CUDA-only tests; CPU-only build/tests pass, while local CUDA validation remains pending because nvcc/CUDA Toolkit is unavailable. |
 | 2026-08-17 | Implemented Phase 11 multi-cell readiness tests: one CPU model now covers many external states/contexts with reused workspace; matching CUDA readiness coverage was added but local CUDA validation is pending because nvcc/CUDA Toolkit is unavailable. |
 | 2026-08-17 | Implemented Phase 12 integration-boundary update: fixed-parameter analytical examples now use high-level CUDA RHS models inside example-only Euler/RK4 loops, and CPU tests verify an external Euler loop can drive `CpuPBEModel`; CUDA example validation is pending because nvcc/CUDA Toolkit is unavailable. |
+| 2026-08-17 | Implemented Phase 13 project-organization pass: analytical CPU RHS verification moved under `tests/verification`, CTest labels and `check_unit`/`check_verification`/`check_cuda` targets added, optional `benchmarks/` subtree introduced, and README layout/build options refreshed; CUDA/example validation remains pending because nvcc/CUDA Toolkit is unavailable. |

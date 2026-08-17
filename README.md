@@ -83,6 +83,7 @@ cmake --build . -j$(nproc)
 | `PBE_BUILD_SHARED` | OFF | Build shared library (`libpbe_cuda.so`) |
 | `PBE_BUILD_EXAMPLES` | ON | Build worked examples |
 | `PBE_BUILD_TESTS` | ON | Build unit/regression tests |
+| `PBE_BUILD_BENCHMARKS` | OFF | Build optional performance benchmarks |
 | `PBE_ENABLE_WARNINGS` | ON | Enable extra compiler warnings |
 | `CMAKE_CUDA_ARCHITECTURES` | `80 86` | Target GPU architectures (override for your hardware) |
 
@@ -144,25 +145,35 @@ Both functions **accumulate** into `rhs` — zero it once before calling either 
 ```
 pbe-fixed-pivot-cuda/
 ├── include/pbe_cuda/
-│   ├── pbe_cuda.cuh          ← umbrella header (include this)
-│   ├── aggregation.cuh       ← AggregationKernel enum, AggregationParams, launch function
-│   └── breakage.cuh          ← BreakageSelection enum, BreakageParams, launch function
+│   ├── pbe_cuda.cuh              ← umbrella header
+│   ├── aggregation*.{cuh,hpp}    ← aggregation launch/configuration API
+│   ├── breakage*.{cuh,hpp}       ← breakage launch/configuration API
+│   ├── cpu_pbe_model.hpp         ← high-level serial RHS model
+│   ├── cuda_pbe_model.hpp        ← high-level CUDA RHS model
+│   └── detail/                   ← shared fixed-pivot helpers
 ├── src/
-│   ├── aggregation.cu        ← aggregation wrapper + kernel dispatch
-│   ├── aggregation_kernels.cuh  ← internal CUDA kernels (not installed)
-│   ├── breakage.cu           ← breakage wrapper + kernel dispatch
-│   ├── breakage_kernels.cuh  ← internal CUDA kernels (not installed)
-│   └── utils.cu              ← shared utilities
+│   ├── aggregation_cpu.cpp       ← serial aggregation RHS
+│   ├── aggregation.cu            ← CUDA aggregation wrapper + dispatch
+│   ├── breakage_cpu.cpp          ← serial breakage RHS
+│   ├── breakage.cu               ← CUDA breakage wrapper + dispatch
+│   └── *_kernels.cuh             ← internal CUDA kernels
 ├── examples/
-│   ├── homogeneous_batch/           ← aggregation: Smoluchowski validation
-│   └── homogeneous_batch_breakage/  ← breakage: volume conservation validation
+│   ├── common/                  ← example-only utilities and ODE steppers
+│   ├── aggregation_*/           ← analytical aggregation examples
+│   ├── breakage_*/              ← analytical breakage examples
+│   └── flocculation_two_stage/  ← combined application case
 ├── tests/
-│   └── unit/
+│   ├── unit/                    ← focused API/configuration/kernel tests
+│   └── verification/            ← analytical/regression verification tests
+├── benchmarks/                  ← optional performance benchmark targets
 ├── docs/
 ├── cmake/
 │   └── pbe_cudaConfig.cmake.in
 └── CMakeLists.txt
 ```
+
+CTest labels mirror this layout: use `ctest -L unit`,
+`ctest -L verification`, or, in CUDA builds, `ctest -L cuda`.
 
 ---
 

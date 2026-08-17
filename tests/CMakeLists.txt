@@ -55,8 +55,8 @@ else()
     endif()
 endif()
 
-# ── Helper macro ──────────────────────────────────────────────────────────────
-macro(pbe_add_test target source)
+# ── Helper function ───────────────────────────────────────────────────────────
+function(pbe_add_test target source)
     add_executable(${target} ${source})
     target_link_libraries(${target}
         PRIVATE
@@ -71,22 +71,48 @@ macro(pbe_add_test target source)
         CXX_STANDARD_REQUIRED ON
     )
     include(GoogleTest)
-    gtest_discover_tests(${target})
-endmacro()
+    if(ARGN)
+        gtest_discover_tests(${target} PROPERTIES LABELS "${ARGN}")
+    else()
+        gtest_discover_tests(${target})
+    endif()
+    set(PBE_TEST_TARGETS ${PBE_TEST_TARGETS} ${target} PARENT_SCOPE)
+endfunction()
 
-pbe_add_test(test_array_view unit/test_array_view.cpp)
-pbe_add_test(test_backend unit/test_backend.cpp)
-pbe_add_test(test_aggregation_model unit/test_aggregation_model.cpp)
-pbe_add_test(test_breakage_model unit/test_breakage_model.cpp)
-pbe_add_test(test_cpu_pbe_model unit/test_cpu_pbe_model.cpp)
-pbe_add_test(test_fixed_pivot unit/test_fixed_pivot.cpp)
-pbe_add_test(test_model_config unit/test_model_config.cpp)
-pbe_add_test(test_sectional_grid unit/test_sectional_grid.cpp)
-pbe_add_test(test_cpu_rhs unit/test_cpu_rhs.cpp)
+pbe_add_test(test_array_view unit/test_array_view.cpp unit)
+pbe_add_test(test_backend unit/test_backend.cpp unit)
+pbe_add_test(test_aggregation_model unit/test_aggregation_model.cpp unit)
+pbe_add_test(test_breakage_model unit/test_breakage_model.cpp unit)
+pbe_add_test(test_cpu_pbe_model unit/test_cpu_pbe_model.cpp unit)
+pbe_add_test(test_fixed_pivot unit/test_fixed_pivot.cpp unit)
+pbe_add_test(test_model_config unit/test_model_config.cpp unit)
+pbe_add_test(test_sectional_grid unit/test_sectional_grid.cpp unit)
+
+pbe_add_test(test_cpu_rhs verification/test_cpu_rhs.cpp verification)
 
 if(ENABLE_CUDA)
-    pbe_add_test(test_cuda_backend unit/test_cuda_backend.cpp)
-    pbe_add_test(test_cuda_pbe_model unit/test_cuda_pbe_model.cpp)
-    pbe_add_test(test_aggregation unit/test_aggregation.cpp)
-    pbe_add_test(test_breakage    unit/test_breakage.cpp)
+    pbe_add_test(test_cuda_backend unit/test_cuda_backend.cpp unit cuda)
+    pbe_add_test(test_cuda_pbe_model unit/test_cuda_pbe_model.cpp unit cuda)
+    pbe_add_test(test_aggregation unit/test_aggregation.cpp verification cuda)
+    pbe_add_test(test_breakage    unit/test_breakage.cpp verification cuda)
+endif()
+
+add_custom_target(check_unit
+    COMMAND ${CMAKE_CTEST_COMMAND} --label-regex unit --output-on-failure
+    DEPENDS ${PBE_TEST_TARGETS}
+    USES_TERMINAL
+)
+
+add_custom_target(check_verification
+    COMMAND ${CMAKE_CTEST_COMMAND} --label-regex verification --output-on-failure
+    DEPENDS ${PBE_TEST_TARGETS}
+    USES_TERMINAL
+)
+
+if(ENABLE_CUDA)
+    add_custom_target(check_cuda
+        COMMAND ${CMAKE_CTEST_COMMAND} --label-regex cuda --output-on-failure
+        DEPENDS ${PBE_TEST_TARGETS}
+        USES_TERMINAL
+    )
 endif()
