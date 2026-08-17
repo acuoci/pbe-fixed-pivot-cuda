@@ -288,7 +288,7 @@ well-defined numerical tolerances and document the expected error scale.
   coefficients rejected at setup.
 - **API implications:** Preferred high-level config begins; low-level API remains.
 - **Main risks:** Do not visit variants inside O(N^2) loops.
-- **Status:** Not started.
+- **Status:** Completed.
 
 ### Phase 7: Strongly Typed Breakage Configuration
 
@@ -433,3 +433,4 @@ new process contributions while preserving process-specific numerical algorithms
 | 2026-08-17 | Completed Phase 3: added validated host `SectionalGrid` with owned pivots, geometric metadata, grid views, and tests while preserving raw-pointer launch APIs. |
 | 2026-08-17 | Completed Phase 4: extracted shared fixed-pivot bracket and birth-allocation helpers for CPU/CUDA paths with direct utility tests and unchanged RHS launch APIs. |
 | 2026-08-17 | Completed Phase 5: added early `PBEModelConfig` and per-call `EvaluationContext` types with setup/context validation tests and no RHS dispatch changes. |
+| 2026-08-17 | Completed Phase 6: added strongly typed aggregation model configuration, setup-time coefficient validation, and one-time mapping to existing `AggregationParams`. |
