@@ -71,6 +71,7 @@ set(PBE_PUBLIC_HEADERS
     include/pbe_cuda/array_view.hpp
     include/pbe_cuda/backend.hpp
     include/pbe_cuda/cuda_compat.cuh
+    include/pbe_cuda/cpu_pbe_model.hpp
     include/pbe_cuda/aggregation.cuh
     include/pbe_cuda/aggregation_model.hpp
     include/pbe_cuda/breakage.cuh

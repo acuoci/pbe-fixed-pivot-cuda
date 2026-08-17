@@ -323,7 +323,7 @@ well-defined numerical tolerances and document the expected error scale.
   calls with changing contexts.
 - **API implications:** New high-level CPU API.
 - **Main risks:** Avoid allocations or expensive validation in `compute_rhs`.
-- **Status:** Not started.
+- **Status:** Completed.
 
 ### Phase 10: CUDA PBEModel
 
@@ -436,3 +436,4 @@ new process contributions while preserving process-specific numerical algorithms
 | 2026-08-17 | Completed Phase 6: added strongly typed aggregation model configuration, setup-time coefficient validation, and one-time mapping to existing `AggregationParams`. |
 | 2026-08-17 | Completed Phase 7: added strongly typed breakage selection/daughter configuration, setup-time quadrature generation, expert user quadrature, and mapping to existing `BreakageParams`. |
 | 2026-08-17 | Completed Phase 8: added explicit CPU/CUDA backend resource types, CPU workspace reuse, CUDA stream/device-buffer/device-grid/workspace wrappers, and backend tests without changing RHS launch APIs. |
+| 2026-08-17 | Completed Phase 9: added high-level serial `CpuPBEModel` coordinating typed aggregation/breakage configs, external state/RHS views, `EvaluationContext`, and `CpuWorkspace` while matching manual low-level RHS calls. |
