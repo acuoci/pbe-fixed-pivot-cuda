@@ -87,6 +87,7 @@ pbe_add_test(test_cpu_pbe_model unit/test_cpu_pbe_model.cpp unit)
 pbe_add_test(test_fixed_pivot unit/test_fixed_pivot.cpp unit)
 pbe_add_test(test_model_config unit/test_model_config.cpp unit)
 pbe_add_test(test_sectional_grid unit/test_sectional_grid.cpp unit)
+pbe_add_test(test_source_model unit/test_source_model.cpp unit)
 
 pbe_add_test(test_cpu_rhs verification/test_cpu_rhs.cpp verification)
 

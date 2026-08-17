@@ -14,6 +14,7 @@
 #include "pbe_cuda/breakage.cuh"
 #include "pbe_cuda/model_config.hpp"
 #include "pbe_cuda/sectional_grid.hpp"
+#include "pbe_cuda/source.cuh"
 
 #include <optional>
 #include <stdexcept>
@@ -51,6 +52,11 @@ public:
     [[nodiscard]] bool has_breakage() const noexcept
     {
         return breakage_params_.has_value();
+    }
+
+    [[nodiscard]] bool has_constant_source() const noexcept
+    {
+        return constant_source_params_.has_value();
     }
 
     [[nodiscard]] cudaError_t compute_rhs(ConstDeviceRealView N,
@@ -91,6 +97,14 @@ public:
                 return err;
         }
 
+        if (constant_source_params_) {
+            const cudaError_t err = launch_constant_source_rhs(
+                source_rates_device_.data(), rhs.data(),
+                *constant_source_params_, workspace.stream());
+            if (err != cudaSuccess)
+                return err;
+        }
+
         return cudaSuccess;
     }
 
@@ -105,6 +119,9 @@ private:
         if (config.breakage_enabled && !config.breakage_model)
             throw std::invalid_argument(
                 "CudaPBEModel: breakage_enabled requires breakage_model");
+        if (config.constant_source_enabled && !config.constant_source_model)
+            throw std::invalid_argument(
+                "CudaPBEModel: constant_source_enabled requires constant_source_model");
 
         return *config.grid;
     }
@@ -130,6 +147,15 @@ private:
             t_q_device_.upload(breakage_quadrature_.t_view(), setup_stream);
             bw_q_device_.upload(breakage_quadrature_.bw_view(), setup_stream);
         }
+
+        if (config.constant_source_model) {
+            constant_source_params_ = config.constant_source_model->to_params(
+                grid_, block_size);
+            source_rates_device_.resize(
+                config.constant_source_model->rates().size());
+            source_rates_device_.upload(
+                config.constant_source_model->rates(), setup_stream);
+        }
     }
 
     void validate_state_views(ConstDeviceRealView N,
@@ -150,9 +176,11 @@ private:
     CudaDeviceGrid device_grid_;
     std::optional<AggregationParams> aggregation_params_;
     std::optional<BreakageParams> breakage_params_;
+    std::optional<ConstantSourceParams> constant_source_params_;
     BreakageQuadrature breakage_quadrature_;
     CudaDeviceBuffer<double> t_q_device_;
     CudaDeviceBuffer<double> bw_q_device_;
+    CudaDeviceBuffer<double> source_rates_device_;
 };
 
 #endif // defined(PBE_ENABLE_CUDA)

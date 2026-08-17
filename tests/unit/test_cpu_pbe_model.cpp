@@ -122,6 +122,66 @@ TEST(CpuPBEModel, CombinedRhsMatchesManualAggregationPlusBreakage)
     expect_vectors_near(rhs, expected, 0.0);
 }
 
+TEST(CpuPBEModel, ConstantSourceOnlyAddsConfiguredRates)
+{
+    pbe_cuda::PBEModelConfig config;
+    config.grid = make_grid();
+    config.constant_source_model =
+        pbe_cuda::ConstantSourceModel({1.0, -2.0, 0.5, 0.0, 3.0});
+
+    const pbe_cuda::CpuPBEModel model(config);
+    pbe_cuda::CpuWorkspace workspace;
+
+    const std::vector<double> N(5, 0.0);
+    std::vector<double> rhs(5, 99.0);
+    const std::vector<double> expected = {1.0, -2.0, 0.5, 0.0, 3.0};
+
+    ASSERT_TRUE(model.has_constant_source());
+    ASSERT_EQ(model.compute_rhs(view(N), view(rhs), workspace), cudaSuccess);
+    expect_vectors_near(rhs, expected, 0.0);
+}
+
+TEST(CpuPBEModel, ConstantSourceAccumulatesAfterExistingProcesses)
+{
+    pbe_cuda::PBEModelConfig config;
+    config.grid = make_grid();
+    config.aggregation_model = pbe_cuda::AggregationModel::constant(0.25);
+    config.breakage_model = pbe_cuda::BreakageModel::constant_symmetric(0.5);
+    config.constant_source_model =
+        pbe_cuda::ConstantSourceModel({0.1, 0.2, -0.3, 0.4, 0.0});
+
+    const pbe_cuda::CpuPBEModel model(config);
+    pbe_cuda::CpuWorkspace workspace;
+
+    const std::vector<double> N = {1.0, 2.0, 0.0, 1.0, 0.0};
+    std::vector<double> rhs(5, 0.0);
+    std::vector<double> expected(5, 0.0);
+
+    const auto aggregation_params =
+        config.aggregation_model->to_params(*config.grid);
+    ASSERT_EQ(pbe_cuda::launch_aggregation_rhs_cpu(
+                  N.data(), config.grid->data(), expected.data(),
+                  aggregation_params),
+              cudaSuccess);
+
+    const auto breakage_params = config.breakage_model->to_params(*config.grid);
+    const auto& q = config.breakage_model->quadrature();
+    ASSERT_EQ(pbe_cuda::launch_breakage_rhs_cpu(
+                  N.data(), config.grid->data(), q.t_q.data(), q.bw_q.data(),
+                  expected.data(), breakage_params),
+              cudaSuccess);
+
+    const auto source_params =
+        config.constant_source_model->to_params(*config.grid);
+    ASSERT_EQ(pbe_cuda::launch_constant_source_rhs_cpu(
+                  config.constant_source_model->rates().data(),
+                  expected.data(), source_params),
+              cudaSuccess);
+
+    ASSERT_EQ(model.compute_rhs(view(N), view(rhs), workspace), cudaSuccess);
+    expect_vectors_near(rhs, expected, 0.0);
+}
+
 TEST(CpuPBEModel, RepeatedCallsWithChangingContextReuseWorkspace)
 {
     pbe_cuda::PBEModelConfig config;
@@ -255,6 +315,12 @@ TEST(CpuPBEModel, RejectsInvalidConfigurationAndInputs)
     missing_aggregation_model.grid = make_grid();
     missing_aggregation_model.aggregation_enabled = true;
     EXPECT_THROW((void)pbe_cuda::CpuPBEModel{missing_aggregation_model},
+                 std::invalid_argument);
+
+    pbe_cuda::PBEModelConfig missing_source_model;
+    missing_source_model.grid = make_grid();
+    missing_source_model.constant_source_enabled = true;
+    EXPECT_THROW((void)pbe_cuda::CpuPBEModel{missing_source_model},
                  std::invalid_argument);
 
     pbe_cuda::PBEModelConfig valid;

@@ -394,7 +394,10 @@ well-defined numerical tolerances and document the expected error scale.
 - **API implications:** Future extension point.
 - **Main risks:** Growth-like processes may require numerical schemes distinct
   from aggregation/breakage; avoid forcing all processes into one hierarchy.
-- **Status:** Not started.
+- **Status:** In progress. A minimal additive constant-source contribution now
+  establishes the process-contribution convention across configuration,
+  CPU/CUDA RHS launch APIs, and high-level CPU/CUDA models. CPU-only builds and
+  tests pass; CUDA validation awaits nvcc/CUDA Toolkit availability.
 
 ## 8. Architectural Decisions
 
@@ -450,3 +453,4 @@ new process contributions while preserving process-specific numerical algorithms
 | 2026-08-17 | Implemented Phase 11 multi-cell readiness tests: one CPU model now covers many external states/contexts with reused workspace; matching CUDA readiness coverage was added but local CUDA validation is pending because nvcc/CUDA Toolkit is unavailable. |
 | 2026-08-17 | Implemented Phase 12 integration-boundary update: fixed-parameter analytical examples now use high-level CUDA RHS models inside example-only Euler/RK4 loops, and CPU tests verify an external Euler loop can drive `CpuPBEModel`; CUDA example validation is pending because nvcc/CUDA Toolkit is unavailable. |
 | 2026-08-17 | Implemented Phase 13 project-organization pass: analytical CPU RHS verification moved under `tests/verification`, CTest labels and `check_unit`/`check_verification`/`check_cuda` targets added, optional `benchmarks/` subtree introduced, and README layout/build options refreshed; CUDA/example validation remains pending because nvcc/CUDA Toolkit is unavailable. |
+| 2026-08-17 | Implemented Phase 14 minimal future-process extension point: added additive per-section constant source model, CPU/CUDA contribution launch APIs, high-level model integration, and tests; CPU-only build/tests pass, while CUDA validation remains pending because nvcc/CUDA Toolkit is unavailable. |

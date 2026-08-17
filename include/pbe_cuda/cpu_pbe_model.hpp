@@ -14,6 +14,7 @@
 #include "pbe_cuda/breakage.cuh"
 #include "pbe_cuda/model_config.hpp"
 #include "pbe_cuda/sectional_grid.hpp"
+#include "pbe_cuda/source.cuh"
 
 #include <algorithm>
 #include <optional>
@@ -35,6 +36,9 @@ public:
         if (config.breakage_enabled && !config.breakage_model)
             throw std::invalid_argument(
                 "CpuPBEModel: breakage_enabled requires breakage_model");
+        if (config.constant_source_enabled && !config.constant_source_model)
+            throw std::invalid_argument(
+                "CpuPBEModel: constant_source_enabled requires constant_source_model");
 
         if (config.aggregation_model)
             aggregation_params_ = config.aggregation_model->to_params(
@@ -43,6 +47,11 @@ public:
             breakage_params_ = config.breakage_model->to_params(
                 grid_, block_size);
             breakage_quadrature_ = config.breakage_model->quadrature();
+        }
+        if (config.constant_source_model) {
+            constant_source_model_ = *config.constant_source_model;
+            constant_source_params_ = constant_source_model_->to_params(
+                grid_, block_size);
         }
     }
 
@@ -54,6 +63,10 @@ public:
     [[nodiscard]] bool has_breakage() const noexcept
     {
         return breakage_params_.has_value();
+    }
+    [[nodiscard]] bool has_constant_source() const noexcept
+    {
+        return constant_source_params_.has_value();
     }
 
     [[nodiscard]] cudaError_t compute_rhs(ConstRealView N,
@@ -90,6 +103,14 @@ public:
                 return err;
         }
 
+        if (constant_source_params_) {
+            const cudaError_t err = launch_constant_source_rhs_cpu(
+                constant_source_model_->rates().data(), rhs.data(),
+                *constant_source_params_);
+            if (err != cudaSuccess)
+                return err;
+        }
+
         return cudaSuccess;
     }
 
@@ -117,6 +138,8 @@ private:
     SectionalGrid grid_;
     std::optional<AggregationParams> aggregation_params_;
     std::optional<BreakageParams> breakage_params_;
+    std::optional<ConstantSourceModel> constant_source_model_;
+    std::optional<ConstantSourceParams> constant_source_params_;
     BreakageQuadrature breakage_quadrature_;
 };
 

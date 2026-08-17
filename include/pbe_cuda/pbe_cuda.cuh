@@ -24,3 +24,5 @@
 #include "pbe_cuda/cuda_pbe_model.hpp"
 #include "pbe_cuda/model_config.hpp"
 #include "pbe_cuda/sectional_grid.hpp"
+#include "pbe_cuda/source.cuh"
+#include "pbe_cuda/source_model.hpp"

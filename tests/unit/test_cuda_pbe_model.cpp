@@ -204,6 +204,38 @@ TEST(CudaPBEModel, CombinedRhsMatchesCpuReference)
     expect_vectors_near(cuda_rhs, cpu_rhs, 1.0e-12);
 }
 
+TEST(CudaPBEModel, ConstantSourceOnlyMatchesCpuReference)
+{
+    if (!has_cuda_device())
+        GTEST_SKIP() << "No CUDA device available";
+
+    pbe_cuda::PBEModelConfig config;
+    config.grid = make_grid();
+    config.constant_source_model =
+        pbe_cuda::ConstantSourceModel({1.0, -2.0, 0.5, 0.0, 3.0});
+
+    pbe_cuda::CudaWorkspace workspace;
+    const pbe_cuda::CudaPBEModel model(config, 256, workspace.stream());
+
+    const std::vector<double> N(5, 0.0);
+    pbe_cuda::CudaDeviceBuffer<double> d_N;
+    pbe_cuda::CudaDeviceBuffer<double> d_rhs(N.size());
+    upload(d_N, N, workspace.stream());
+
+    ASSERT_EQ(model.compute_rhs(device_view(d_N), device_view(d_rhs),
+                                workspace),
+              cudaSuccess);
+    const auto cuda_rhs = download(d_rhs, workspace.stream());
+
+    pbe_cuda::CpuPBEModel cpu_model(config);
+    pbe_cuda::CpuWorkspace cpu_workspace;
+    std::vector<double> cpu_rhs(N.size(), 0.0);
+    ASSERT_EQ(cpu_model.compute_rhs(view(N), view(cpu_rhs), cpu_workspace),
+              cudaSuccess);
+
+    expect_vectors_near(cuda_rhs, cpu_rhs, 0.0);
+}
+
 TEST(CudaPBEModel, RepeatedCallsWithChangingContextReuseWorkspace)
 {
     if (!has_cuda_device())
@@ -315,6 +347,13 @@ TEST(CudaPBEModel, RejectsInvalidConfigurationAndInputs)
     missing_aggregation_model.aggregation_enabled = true;
     EXPECT_THROW((void)pbe_cuda::CudaPBEModel{
                      missing_aggregation_model, 256, workspace.stream()},
+                 std::invalid_argument);
+
+    pbe_cuda::PBEModelConfig missing_source_model;
+    missing_source_model.grid = make_grid();
+    missing_source_model.constant_source_enabled = true;
+    EXPECT_THROW((void)pbe_cuda::CudaPBEModel{
+                     missing_source_model, 256, workspace.stream()},
                  std::invalid_argument);
 
     pbe_cuda::PBEModelConfig valid;

@@ -17,7 +17,7 @@ This repository provides a **C++/CUDA library** implementing the aggregation and
 The library computes the right-hand side (RHS) of the semi-discrete PBE:
 
 ```
-dN/dt = R_agg(N) + R_br(N)
+dN/dt = R_agg(N) + R_br(N) + R_src(...)
 ```
 
 where `N` is the vector of section-integrated number concentrations. The caller is responsible for time integration, allowing the library to be embedded in any ODE solver (explicit Euler, RK4, CVODE, etc.) or CFD framework.
@@ -26,6 +26,7 @@ where `N` is the vector of section-integrated number concentrations. The caller 
 
 - **Aggregation** — eight kernels: constant, sum, product, Brownian continuum, Brownian free-molecular, shear, and both Brownian/shear combinations
 - **Breakage** — four selection functions (constant, linear, power-law, threshold) and four daughter distributions (uniform, symmetric binary, power-law, erosion)
+- **Additive source contribution** — minimal constant-source extension point for future process models
 - **Fixed-pivot redistribution** — exact conservation of particle volume by construction
 - **O(1) bin lookup** for geometric grids; O(log N) binary search fallback for general grids
 - **Tiled shared-memory accumulation** — reduces global atomic contention at high resolution
@@ -148,6 +149,7 @@ pbe-fixed-pivot-cuda/
 │   ├── pbe_cuda.cuh              ← umbrella header
 │   ├── aggregation*.{cuh,hpp}    ← aggregation launch/configuration API
 │   ├── breakage*.{cuh,hpp}       ← breakage launch/configuration API
+│   ├── source*.{cuh,hpp}         ← additive source contribution API
 │   ├── cpu_pbe_model.hpp         ← high-level serial RHS model
 │   ├── cuda_pbe_model.hpp        ← high-level CUDA RHS model
 │   └── detail/                   ← shared fixed-pivot helpers
@@ -156,6 +158,8 @@ pbe-fixed-pivot-cuda/
 │   ├── aggregation.cu            ← CUDA aggregation wrapper + dispatch
 │   ├── breakage_cpu.cpp          ← serial breakage RHS
 │   ├── breakage.cu               ← CUDA breakage wrapper + dispatch
+│   ├── source_cpu.cpp            ← serial additive source RHS
+│   ├── source.cu                 ← CUDA additive source wrapper
 │   └── *_kernels.cuh             ← internal CUDA kernels
 ├── examples/
 │   ├── common/                  ← example-only utilities and ODE steppers

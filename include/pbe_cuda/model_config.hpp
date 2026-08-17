@@ -10,6 +10,7 @@
 #include "pbe_cuda/aggregation_model.hpp"
 #include "pbe_cuda/breakage_model.hpp"
 #include "pbe_cuda/sectional_grid.hpp"
+#include "pbe_cuda/source_model.hpp"
 
 #include <cmath>
 #include <optional>
@@ -80,15 +81,18 @@ struct PBEModelConfig {
     std::optional<SectionalGrid> grid;
     std::optional<AggregationModel> aggregation_model;
     std::optional<BreakageModel> breakage_model;
+    std::optional<ConstantSourceModel> constant_source_model;
     bool aggregation_enabled = false;
     bool breakage_enabled = false;
+    bool constant_source_enabled = false;
 
     [[nodiscard]] bool has_grid() const noexcept { return grid.has_value(); }
 
     [[nodiscard]] bool has_enabled_process() const noexcept
     {
         return aggregation_enabled || aggregation_model ||
-               breakage_enabled || breakage_model;
+               breakage_enabled || breakage_model ||
+               constant_source_enabled || constant_source_model;
     }
 
     void validate() const
@@ -99,6 +103,10 @@ struct PBEModelConfig {
             aggregation_model->validate();
         if (breakage_model)
             breakage_model->validate();
+        if (constant_source_model) {
+            constant_source_model->validate();
+            (void)constant_source_model->to_params(*grid);
+        }
         if (!has_enabled_process())
             throw std::invalid_argument(
                 "PBEModelConfig: at least one process must be enabled");

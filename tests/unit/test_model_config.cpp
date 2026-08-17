@@ -73,3 +73,24 @@ TEST(PBEModelConfig, ValidatesMinimalCurrentModelConfiguration)
     EXPECT_TRUE(config.has_enabled_process());
     EXPECT_NO_THROW(config.validate());
 }
+
+TEST(PBEModelConfig, AcceptsConstantSourceAsIndependentProcess)
+{
+    pbe_cuda::PBEModelConfig config;
+    config.grid = pbe_cuda::SectionalGrid::geometric(4, 1.0, 2.0);
+    config.constant_source_model =
+        pbe_cuda::ConstantSourceModel::uniform(*config.grid, 0.1);
+
+    EXPECT_TRUE(config.has_grid());
+    EXPECT_TRUE(config.has_enabled_process());
+    EXPECT_NO_THROW(config.validate());
+}
+
+TEST(PBEModelConfig, RejectsConstantSourceGridSizeMismatch)
+{
+    pbe_cuda::PBEModelConfig config;
+    config.grid = pbe_cuda::SectionalGrid::geometric(4, 1.0, 2.0);
+    config.constant_source_model = pbe_cuda::ConstantSourceModel({1.0, 2.0});
+
+    EXPECT_THROW(config.validate(), std::invalid_argument);
+}

@@ -65,6 +65,7 @@ set(PBE_SOURCES
     src/aggregation_cpu.cpp
     src/breakage_cpu.cpp
     src/sectional_grid.cpp
+    src/source_cpu.cpp
 )
 
 set(PBE_PUBLIC_HEADERS
@@ -74,6 +75,8 @@ set(PBE_PUBLIC_HEADERS
     include/pbe_cuda/cuda_compat.cuh
     include/pbe_cuda/cpu_pbe_model.hpp
     include/pbe_cuda/cuda_pbe_model.hpp
+    include/pbe_cuda/source.cuh
+    include/pbe_cuda/source_model.hpp
     include/pbe_cuda/aggregation.cuh
     include/pbe_cuda/aggregation_model.hpp
     include/pbe_cuda/breakage.cuh
@@ -86,6 +89,7 @@ if(ENABLE_CUDA)
     list(APPEND PBE_SOURCES
         src/aggregation.cu
         src/breakage.cu
+        src/source.cu
         src/utils.cu
     )
 endif()
