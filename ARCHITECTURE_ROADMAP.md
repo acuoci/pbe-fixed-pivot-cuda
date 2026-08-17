@@ -311,7 +311,7 @@ well-defined numerical tolerances and document the expected error scale.
 - **Required tests:** Device grid upload once; workspace reuse; CUDA smoke tests.
 - **API implications:** Add explicit backend/resource types.
 - **Main risks:** Avoid implicit transfers and synchronization.
-- **Status:** Not started.
+- **Status:** Completed.
 
 ### Phase 9: CPU PBEModel
 
@@ -435,3 +435,4 @@ new process contributions while preserving process-specific numerical algorithms
 | 2026-08-17 | Completed Phase 5: added early `PBEModelConfig` and per-call `EvaluationContext` types with setup/context validation tests and no RHS dispatch changes. |
 | 2026-08-17 | Completed Phase 6: added strongly typed aggregation model configuration, setup-time coefficient validation, and one-time mapping to existing `AggregationParams`. |
 | 2026-08-17 | Completed Phase 7: added strongly typed breakage selection/daughter configuration, setup-time quadrature generation, expert user quadrature, and mapping to existing `BreakageParams`. |
+| 2026-08-17 | Completed Phase 8: added explicit CPU/CUDA backend resource types, CPU workspace reuse, CUDA stream/device-buffer/device-grid/workspace wrappers, and backend tests without changing RHS launch APIs. |
