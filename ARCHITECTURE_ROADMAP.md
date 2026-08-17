@@ -214,7 +214,7 @@ well-defined numerical tolerances and document the expected error scale.
   analytical tests.
 - **API implications:** None initially.
 - **Main risks:** CMake/toolchain standard mismatches.
-- **Status:** Not started.
+- **Status:** Completed.
 
 ### Phase 1: Baseline Regression Lock
 
@@ -391,7 +391,7 @@ well-defined numerical tolerances and document the expected error scale.
 
 | Decision | Current recommendation | Status | Rationale |
 |---|---|---|---|
-| C++ standard | Prefer one project-wide standard; use C++17 unless CUDA/compiler matrix proves C++20 is safe and worthwhile | Open | C++17 maximizes CUDA/HPC compatibility and is sufficient for the planned design |
+| C++ standard | Use C++17 consistently across host code, tests, examples, and CUDA-facing code | Accepted | C++17 maximizes CUDA/HPC compatibility and is sufficient for the planned design |
 | CPU/CUDA backend strategy | Keep both first-class; make memory/backend expectations explicit | Accepted | Avoids ambiguous host/device pointer usage and preserves performance |
 | Runtime vs compile-time model selection | Runtime at setup/wrapper level; compile-time specialization in hot CUDA paths | Accepted | Usable configuration without hot-loop overhead |
 | State/RHS ownership | External solver/user owns `N` and `rhs` | Accepted | Enables embedding and avoids copies |
@@ -427,3 +427,4 @@ new process contributions while preserving process-specific numerical algorithms
 | Date | Change |
 |---|---|
 | 2026-08-17 | Initial architecture roadmap created. |
+| 2026-08-17 | Completed Phase 0: project C++ standard policy aligned to C++17. |

@@ -10,7 +10,8 @@
 | GPU compute capability | sm_80 or higher | A100, A30 (sm_80); RTX 30xx, A40 (sm_86); H100 (sm_90) |
 | Host compiler | GCC 9+ | Must be compatible with the installed CUDA Toolkit |
 
-> **Note:** C++20 is not supported for device code by all host compiler / CUDA Toolkit combinations. The library uses C++17 for device code, which is universally supported. Host code using the library can be compiled as C++20.
+> **Note:** The library uses C++17 consistently for host and device-facing code
+> to maximize compatibility with CUDA/HPC compiler combinations.
 
 ---
 
@@ -208,7 +209,8 @@ The kernel was compiled for a different architecture than the GPU you are runnin
 The CUDA architecture flag is not being passed to nvcc. Ensure `CMAKE_CUDA_ARCHITECTURES` is set before `project()` in `CMakeLists.txt`. See the note in the GPU architecture section above.
 
 **`nvcc warning: -std=c++20 flag not supported`:**
-The host compiler does not support C++20 for device code with this CUDA Toolkit version. The library uses C++17 for device code; this warning is harmless if it appears only as a warning. If it becomes an error, set `CMAKE_CUDA_STANDARD=17` explicitly.
+The build should not request C++20. Reconfigure from a clean build directory and
+verify `CMAKE_CXX_STANDARD=17` and `CMAKE_CUDA_STANDARD=17`.
 
 **GoogleTest not found:**
 Either set `-DGTEST_ROOT=/path/to/gtest` to point to an existing installation, or ensure internet access is available for FetchContent to download it automatically.
