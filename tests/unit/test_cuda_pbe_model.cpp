@@ -245,6 +245,64 @@ TEST(CudaPBEModel, RepeatedCallsWithChangingContextReuseWorkspace)
     EXPECT_TRUE(workspace.scratch().empty());
 }
 
+TEST(CudaPBEModel, ManyLocalStatesReuseOneModelDeviceBuffersAndWorkspace)
+{
+    if (!has_cuda_device())
+        GTEST_SKIP() << "No CUDA device available";
+
+    pbe_cuda::PBEModelConfig config;
+    config.grid = make_grid();
+    config.aggregation_model =
+        pbe_cuda::AggregationModel::brownian_continuum_shear(2.0e-5, 1.0e-3);
+    config.breakage_model =
+        pbe_cuda::BreakageModel::threshold_erosion(0.75, 2.0, 0.05);
+
+    pbe_cuda::CudaWorkspace workspace;
+    const pbe_cuda::CudaPBEModel model(config, 256, workspace.stream());
+    const double* const device_grid_data = model.device_grid().data();
+
+    pbe_cuda::CpuPBEModel cpu_model(config);
+    pbe_cuda::CpuWorkspace cpu_workspace;
+
+    pbe_cuda::CudaDeviceBuffer<double> d_N(config.grid->size());
+    pbe_cuda::CudaDeviceBuffer<double> d_rhs(config.grid->size());
+    const double* const d_N_data = d_N.data();
+    double* const d_rhs_data = d_rhs.data();
+
+    constexpr int n_cells = 64;
+    for (int cell = 0; cell < n_cells; ++cell) {
+        const double c = static_cast<double>(cell);
+        const std::vector<double> N = {1.0 + 0.01 * c,
+                                       0.5 + 0.02 * c,
+                                       0.25 + 0.005 * c,
+                                       0.1 + 0.001 * c,
+                                       0.0};
+
+        pbe_cuda::EvaluationContext context;
+        context.temperature = 290.0 + c;
+        context.pressure = 101325.0 + 10.0 * c;
+        context.viscosity = 1.0e-3 + 1.0e-6 * c;
+        context.shear_rate = 0.5 * c;
+
+        upload(d_N, N, workspace.stream());
+        ASSERT_EQ(model.compute_rhs(device_view(d_N), device_view(d_rhs),
+                                    context, workspace),
+                  cudaSuccess);
+        const auto cuda_rhs = download(d_rhs, workspace.stream());
+
+        std::vector<double> cpu_rhs(config.grid->size(), 0.0);
+        ASSERT_EQ(cpu_model.compute_rhs(view(N), view(cpu_rhs),
+                                        context, cpu_workspace),
+                  cudaSuccess);
+        expect_vectors_near(cuda_rhs, cpu_rhs, 1.0e-12);
+
+        EXPECT_EQ(model.device_grid().data(), device_grid_data);
+        EXPECT_EQ(d_N.data(), d_N_data);
+        EXPECT_EQ(d_rhs.data(), d_rhs_data);
+        EXPECT_TRUE(workspace.scratch().empty());
+    }
+}
+
 TEST(CudaPBEModel, RejectsInvalidConfigurationAndInputs)
 {
     if (!has_cuda_device())

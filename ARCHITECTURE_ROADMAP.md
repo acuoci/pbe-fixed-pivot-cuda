@@ -349,7 +349,9 @@ well-defined numerical tolerances and document the expected error scale.
   allocations.
 - **API implications:** Possible future batch API, not required initially.
 - **Main risks:** Premature batching could distort the core API.
-- **Status:** Not started.
+- **Status:** In progress. CPU multi-state/reused-model readiness is implemented
+  and verified; CUDA readiness coverage is present but awaits nvcc/CUDA Toolkit
+  validation.
 
 ### Phase 12: Move Integrators Out of Core
 
@@ -439,3 +441,4 @@ new process contributions while preserving process-specific numerical algorithms
 | 2026-08-17 | Completed Phase 8: added explicit CPU/CUDA backend resource types, CPU workspace reuse, CUDA stream/device-buffer/device-grid/workspace wrappers, and backend tests without changing RHS launch APIs. |
 | 2026-08-17 | Completed Phase 9: added high-level serial `CpuPBEModel` coordinating typed aggregation/breakage configs, external state/RHS views, `EvaluationContext`, and `CpuWorkspace` while matching manual low-level RHS calls. |
 | 2026-08-17 | Implemented Phase 10 CUDA `CudaPBEModel` wrapper and CUDA-only tests; CPU-only build/tests pass, while local CUDA validation remains pending because nvcc/CUDA Toolkit is unavailable. |
+| 2026-08-17 | Implemented Phase 11 multi-cell readiness tests: one CPU model now covers many external states/contexts with reused workspace; matching CUDA readiness coverage was added but local CUDA validation is pending because nvcc/CUDA Toolkit is unavailable. |
