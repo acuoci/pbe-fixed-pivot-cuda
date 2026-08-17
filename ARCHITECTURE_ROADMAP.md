@@ -275,7 +275,7 @@ well-defined numerical tolerances and document the expected error scale.
   condition-dependent models.
 - **API implications:** Additive concepts for later high-level API.
 - **Main risks:** Overpopulating the context too early.
-- **Status:** Not started.
+- **Status:** Completed.
 
 ### Phase 6: Strongly Typed Aggregation Configuration
 
@@ -432,3 +432,4 @@ new process contributions while preserving process-specific numerical algorithms
 | 2026-08-17 | Completed Phase 2: added lightweight C++17 `ArrayView` and construction/behavior tests without changing raw-pointer launch APIs. |
 | 2026-08-17 | Completed Phase 3: added validated host `SectionalGrid` with owned pivots, geometric metadata, grid views, and tests while preserving raw-pointer launch APIs. |
 | 2026-08-17 | Completed Phase 4: extracted shared fixed-pivot bracket and birth-allocation helpers for CPU/CUDA paths with direct utility tests and unchanged RHS launch APIs. |
+| 2026-08-17 | Completed Phase 5: added early `PBEModelConfig` and per-call `EvaluationContext` types with setup/context validation tests and no RHS dispatch changes. |
