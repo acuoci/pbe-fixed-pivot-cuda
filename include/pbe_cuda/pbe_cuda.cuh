@@ -14,5 +14,6 @@
 
 #pragma once
 
+#include "pbe_cuda/array_view.hpp"
 #include "pbe_cuda/aggregation.cuh"
 #include "pbe_cuda/breakage.cuh"

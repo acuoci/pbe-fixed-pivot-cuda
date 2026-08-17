@@ -74,6 +74,7 @@ macro(pbe_add_test target source)
     gtest_discover_tests(${target})
 endmacro()
 
+pbe_add_test(test_array_view unit/test_array_view.cpp)
 pbe_add_test(test_cpu_rhs unit/test_cpu_rhs.cpp)
 
 if(ENABLE_CUDA)
