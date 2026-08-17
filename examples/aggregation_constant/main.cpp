@@ -75,8 +75,7 @@ int main()
 
     // ---- Grid ------------------------------------------------------------
     const auto x_host    = make_geometric_grid(cfg::n, cfg::v_min, cfg::r);
-    const double log_x0  = std::log(x_host[0]);
-    const double inv_logr= 1.0 / std::log(x_host[1] / x_host[0]);
+    const pbe_cuda::SectionalGrid grid(x_host);
 
     // ---- Initial condition: monodisperse in bin 0 ------------------------
     std::vector<double> N_host(cfg::n, 0.0);
@@ -85,21 +84,16 @@ int main()
     const double M1_ref = compute_M1(N_host, x_host);   // = N0 * v_min
 
     // ---- Device arrays ---------------------------------------------------
-    DeviceArray<double> d_x(cfg::n), d_N(cfg::n), d_rhs(cfg::n);
-    d_x.upload(x_host);
+    DeviceArray<double> d_N(cfg::n), d_rhs(cfg::n);
     d_N.upload(N_host);
 
-    // ---- Library parameters ----------------------------------------------
-    pbe_cuda::AggregationParams params;
-    params.n           = cfg::n;
-    params.log_x0      = log_x0;
-    params.inv_log_r   = inv_logr;
-    params.kernel_type = pbe_cuda::AggregationKernel::Constant;
-    params.beta0       = cfg::beta0;
-    params.beta_bc     = 0.0;
-    params.beta_bfm    = 0.0;
-    params.beta_sh     = 0.0;
-    params.block_size  = 256;
+    // ---- Library model ---------------------------------------------------
+    pbe_cuda::PBEModelConfig model_config;
+    model_config.grid = grid;
+    model_config.aggregation_model =
+        pbe_cuda::AggregationModel::constant(cfg::beta0);
+    pbe_cuda::CudaWorkspace workspace(pbe_cuda::CudaStream::external(0));
+    const pbe_cuda::CudaPBEModel model(model_config, 256, workspace.stream());
 
     const double dt = cfg::t_end / cfg::n_steps;
 
@@ -121,11 +115,12 @@ int main()
     auto rhs_func = [&](const DeviceArray<double>& N_in,
                         DeviceArray<double>&      rhs_out) 
     {
-        rhs_out.zero();
-        cudaError_t err = pbe_cuda::launch_aggregation_rhs(
-            N_in.get(), d_x.get(), rhs_out.get(), params);
+        cudaError_t err = model.compute_rhs(
+            pbe_cuda::ConstDeviceRealView(N_in.get(), N_in.size()),
+            pbe_cuda::DeviceRealView(rhs_out.get(), rhs_out.size()),
+            workspace);
         if (err != cudaSuccess) {
-            std::fprintf(stderr, "Kernel error: %s\n", cudaGetErrorString(err));
+            std::fprintf(stderr, "RHS error: %s\n", cudaGetErrorString(err));
             std::exit(EXIT_FAILURE);
         }
         PBE_CUDA_CHECK(cudaDeviceSynchronize());

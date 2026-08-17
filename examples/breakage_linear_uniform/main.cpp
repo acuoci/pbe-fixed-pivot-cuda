@@ -63,6 +63,7 @@ int main()
 
     // Grid
     const auto x_host   = make_geometric_grid_range(cfg::n, cfg::v_min, cfg::v_max);
+    const pbe_cuda::SectionalGrid grid(x_host);
     const double r       = x_host[1] / x_host[0];
 
     // Exponential IC
@@ -83,20 +84,16 @@ int main()
     ZiffMcGradyAnalytical ana{cfg::N0, cfg::vc, cfg::S0};
 
     // Device arrays
-    DeviceArray<double> d_x(cfg::n),    d_N(cfg::n),   d_rhs(cfg::n);
-    DeviceArray<double> d_t_q(cfg::n_quad), d_bw_q(cfg::n_quad);
-    d_x.upload(x_host);
+    DeviceArray<double> d_N(cfg::n), d_rhs(cfg::n);
     d_N.upload(N_host);
-    d_t_q.upload(t_q_host);
-    d_bw_q.upload(bw_q_host);
 
-    pbe_cuda::BreakageParams p;
-    p.n          = cfg::n;
-    p.n_quad     = cfg::n_quad;
-    p.selection  = pbe_cuda::BreakageSelection::Linear;
-    p.S0         = cfg::S0;
-    p.v_ref      = cfg::vc;
-    p.block_size = 256;
+    pbe_cuda::PBEModelConfig model_config;
+    model_config.grid = grid;
+    model_config.breakage_model = pbe_cuda::BreakageModel(
+        pbe_cuda::LinearBreakageSelection{cfg::S0, cfg::vc},
+        pbe_cuda::UserQuadratureDaughter{t_q_host, bw_q_host});
+    pbe_cuda::CudaWorkspace workspace(pbe_cuda::CudaStream::external(0));
+    const pbe_cuda::CudaPBEModel model(model_config, 256, workspace.stream());
 
     const double dt     = cfg::t_end / cfg::n_steps;
     const double M1_ref = ana.M1(0.0);
@@ -116,12 +113,12 @@ int main()
     auto rhs_func = [&](const DeviceArray<double>& N_in,
                         DeviceArray<double>&       rhs_out) 
     {
-        rhs_out.zero();
-        cudaError_t err = pbe_cuda::launch_breakage_rhs(
-            N_in.get(), d_x.get(), d_t_q.get(), d_bw_q.get(),
-            rhs_out.get(), p);
+        cudaError_t err = model.compute_rhs(
+            pbe_cuda::ConstDeviceRealView(N_in.get(), N_in.size()),
+            pbe_cuda::DeviceRealView(rhs_out.get(), rhs_out.size()),
+            workspace);
         if (err != cudaSuccess) {
-            std::fprintf(stderr, "Kernel error: %s\n", cudaGetErrorString(err));
+            std::fprintf(stderr, "RHS error: %s\n", cudaGetErrorString(err));
             std::exit(EXIT_FAILURE);
         }
         PBE_CUDA_CHECK(cudaDeviceSynchronize());

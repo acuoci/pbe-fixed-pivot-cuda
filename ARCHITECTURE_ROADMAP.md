@@ -362,7 +362,10 @@ well-defined numerical tolerances and document the expected error scale.
 - **Required tests:** Existing analytical examples.
 - **API implications:** Optional utilities only.
 - **Main risks:** Accidentally creating an unsupported ODE solver layer.
-- **Status:** Not started.
+- **Status:** In progress. Fixed-parameter analytical examples now drive
+  example-only Euler/RK4 utilities through the high-level CUDA RHS model, and a
+  CPU external-integrator regression is verified. CUDA example validation awaits
+  nvcc/CUDA Toolkit availability.
 
 ### Phase 13: Project Reorganization
 
@@ -442,3 +445,4 @@ new process contributions while preserving process-specific numerical algorithms
 | 2026-08-17 | Completed Phase 9: added high-level serial `CpuPBEModel` coordinating typed aggregation/breakage configs, external state/RHS views, `EvaluationContext`, and `CpuWorkspace` while matching manual low-level RHS calls. |
 | 2026-08-17 | Implemented Phase 10 CUDA `CudaPBEModel` wrapper and CUDA-only tests; CPU-only build/tests pass, while local CUDA validation remains pending because nvcc/CUDA Toolkit is unavailable. |
 | 2026-08-17 | Implemented Phase 11 multi-cell readiness tests: one CPU model now covers many external states/contexts with reused workspace; matching CUDA readiness coverage was added but local CUDA validation is pending because nvcc/CUDA Toolkit is unavailable. |
+| 2026-08-17 | Implemented Phase 12 integration-boundary update: fixed-parameter analytical examples now use high-level CUDA RHS models inside example-only Euler/RK4 loops, and CPU tests verify an external Euler loop can drive `CpuPBEModel`; CUDA example validation is pending because nvcc/CUDA Toolkit is unavailable. |

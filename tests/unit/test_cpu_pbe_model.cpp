@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <stdexcept>
 #include <vector>
 
@@ -214,6 +215,38 @@ TEST(CpuPBEModel, ManyLocalStatesReuseOneModelAndExternalStorage)
         EXPECT_EQ(model.grid().data(), model_grid_data);
         EXPECT_EQ(workspace.scratch_size(), 0u);
     }
+}
+
+TEST(CpuPBEModel, ExternalEulerLoopCanDriveHighLevelRhsOnlyApi)
+{
+    pbe_cuda::PBEModelConfig config;
+    config.grid = pbe_cuda::SectionalGrid::geometric(128, 1.0e-18, 1.122018);
+
+    constexpr double beta0 = 1.0e-17;
+    constexpr double N0 = 1.0e14;
+    constexpr double t_end = 200.0;
+    constexpr int n_steps = 200;
+    config.aggregation_model = pbe_cuda::AggregationModel::constant(beta0);
+
+    const pbe_cuda::CpuPBEModel model(config);
+    pbe_cuda::CpuWorkspace workspace;
+
+    std::vector<double> N(config.grid->size(), 0.0);
+    std::vector<double> rhs(config.grid->size(), 0.0);
+    N[0] = N0;
+
+    const double dt = t_end / static_cast<double>(n_steps);
+    for (int step = 0; step < n_steps; ++step) {
+        ASSERT_EQ(model.compute_rhs(view(N), view(rhs), workspace), cudaSuccess);
+        for (std::size_t i = 0; i < N.size(); ++i)
+            N[i] += dt * rhs[i];
+    }
+
+    const double t_half = 2.0 / (beta0 * N0);
+    const double expected_m0 = N0 / (1.0 + t_end / t_half);
+    const double actual_m0 = std::accumulate(N.begin(), N.end(), 0.0);
+    EXPECT_NEAR(actual_m0, expected_m0, 2.0e-3 * expected_m0);
+    EXPECT_EQ(workspace.scratch_size(), 0u);
 }
 
 TEST(CpuPBEModel, RejectsInvalidConfigurationAndInputs)

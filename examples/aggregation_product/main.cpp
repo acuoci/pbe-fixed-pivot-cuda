@@ -44,25 +44,22 @@ int main()
     std::printf("GPU : %s  (sm_%d%d)\n\n", prop.name, prop.major, prop.minor);
 
     const auto x_host  = make_geometric_grid_range(cfg::n, cfg::v_min, cfg::v_max);
+    const pbe_cuda::SectionalGrid grid(x_host);
     const double r      = x_host[1] / x_host[0];
-    const double log_x0 = std::log(x_host[0]);
-    const double inv_logr = 1.0 / std::log(r);
 
     auto N_host = make_exponential_ic(x_host, cfg::N0, cfg::vc);
 
     ProductKernelAnalytical ana{cfg::N0, cfg::vc, cfg::beta0};
 
-    DeviceArray<double> d_x(cfg::n), d_N(cfg::n), d_rhs(cfg::n);
-    d_x.upload(x_host);
+    DeviceArray<double> d_N(cfg::n), d_rhs(cfg::n);
     d_N.upload(N_host);
 
-    pbe_cuda::AggregationParams p;
-    p.n           = cfg::n;
-    p.log_x0      = log_x0;
-    p.inv_log_r   = inv_logr;
-    p.kernel_type = pbe_cuda::AggregationKernel::Product;
-    p.beta0       = cfg::beta0;
-    p.block_size  = 256;
+    pbe_cuda::PBEModelConfig model_config;
+    model_config.grid = grid;
+    model_config.aggregation_model =
+        pbe_cuda::AggregationModel::product(cfg::beta0);
+    pbe_cuda::CudaWorkspace workspace(pbe_cuda::CudaStream::external(0));
+    const pbe_cuda::CudaPBEModel model(model_config, 256, workspace.stream());
 
     const double dt     = cfg::t_end / cfg::n_steps;
     const double M1_ref = ana.M1(0.0);
@@ -82,11 +79,12 @@ int main()
     auto rhs_func = [&](const DeviceArray<double>& N_in,
                         DeviceArray<double>&       rhs_out) 
     {
-        rhs_out.zero();
-        cudaError_t err = pbe_cuda::launch_aggregation_rhs(
-            N_in.get(), d_x.get(), rhs_out.get(), p);
+        cudaError_t err = model.compute_rhs(
+            pbe_cuda::ConstDeviceRealView(N_in.get(), N_in.size()),
+            pbe_cuda::DeviceRealView(rhs_out.get(), rhs_out.size()),
+            workspace);
         if (err != cudaSuccess) {
-            std::fprintf(stderr, "Kernel error: %s\n", cudaGetErrorString(err));
+            std::fprintf(stderr, "RHS error: %s\n", cudaGetErrorString(err));
             std::exit(EXIT_FAILURE);
         }
         PBE_CUDA_CHECK(cudaDeviceSynchronize());

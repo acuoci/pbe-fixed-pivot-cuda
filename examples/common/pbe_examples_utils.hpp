@@ -361,8 +361,8 @@ inline void print_table_row(double t,
 //                 DeviceArray<double>&       rhs_out)
 //
 // The callable must:
-//   1. Zero rhs_out before accumulating (use rhs_out.zero())
-//   2. Call launch_aggregation_rhs and/or launch_breakage_rhs
+//   1. Evaluate the configured RHS into rhs_out.
+//      High-level examples should call CudaPBEModel::compute_rhs().
 //   3. Call cudaDeviceSynchronize() before returning
 //
 // Arithmetic (N update) is performed on the host for clarity and
@@ -372,9 +372,10 @@ inline void print_table_row(double t,
 //
 //   auto rhs = [&](const DeviceArray<double>& N_in,
 //                  DeviceArray<double>&       rhs_out) {
-//       rhs_out.zero();
-//       pbe_cuda::launch_aggregation_rhs(
-//           N_in.get(), d_x.get(), rhs_out.get(), agg_params);
+//       model.compute_rhs(
+//           pbe_cuda::ConstDeviceRealView(N_in.get(), N_in.size()),
+//           pbe_cuda::DeviceRealView(rhs_out.get(), rhs_out.size()),
+//           workspace);
 //       PBE_CUDA_CHECK(cudaDeviceSynchronize());
 //   };
 //

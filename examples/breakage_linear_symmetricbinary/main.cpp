@@ -55,9 +55,6 @@ namespace cfg {
     constexpr int    ic_bin   = 384;       // monodisperse IC bin (near top)
     constexpr double S0       = 1.0e-3;    // selection prefactor [1/s]
     constexpr double N0       = 1.0e14;    // initial number concentration [#/m³]
-    constexpr int    n_quad   = 1;         // symmetric binary: 1 quadrature point
-    constexpr double t_q_val  = 0.5;       // fragment fraction: v_frag = v/2
-    constexpr double bw_q_val = 2.0;       // 2 fragments per event
     constexpr double t_end    = 100.0;     // end time [s]
     constexpr int    n_steps  = 10000;     // Euler steps → dt = 0.01 s
     constexpr int    n_print  = 1000;      // print interval
@@ -79,6 +76,7 @@ int main()
 
     // ---- Grid ------------------------------------------------------------
     const auto x_host = make_geometric_grid(cfg::n, cfg::v_min, cfg::r);
+    const pbe_cuda::SectionalGrid grid(x_host);
 
     // v_ref = v₀ = pivot volume of IC bin → S(v₀) = S₀ exactly
     const double v0      = x_host[cfg::ic_bin];
@@ -92,28 +90,17 @@ int main()
     const double N_tot_0  = compute_M0(N_host);          // = N0
     const double V_tot_ref= compute_M1(N_host, x_host);  // = N0 * v0
 
-    // ---- Quadrature arrays: symmetric binary t_q=[0.5], bw_q=[2.0] ------
-    const std::vector<double> t_q_host  = { cfg::t_q_val  };
-    const std::vector<double> bw_q_host = { cfg::bw_q_val };
-
     // ---- Device arrays ---------------------------------------------------
-    DeviceArray<double> d_x(cfg::n),    d_N(cfg::n),   d_rhs(cfg::n);
-    DeviceArray<double> d_t_q(cfg::n_quad), d_bw_q(cfg::n_quad);
-    d_x.upload(x_host);
+    DeviceArray<double> d_N(cfg::n), d_rhs(cfg::n);
     d_N.upload(N_host);
-    d_t_q.upload(t_q_host);
-    d_bw_q.upload(bw_q_host);
 
-    // ---- Library parameters ----------------------------------------------
-    pbe_cuda::BreakageParams params;
-    params.n          = cfg::n;
-    params.n_quad     = cfg::n_quad;
-    params.selection  = pbe_cuda::BreakageSelection::Linear;
-    params.S0         = cfg::S0;
-    params.v_ref      = v_ref;
-    params.alpha      = 1.0;   // unused for Linear
-    params.v_min      = 0.0;   // unused for Linear
-    params.block_size = 256;
+    // ---- Library model ---------------------------------------------------
+    pbe_cuda::PBEModelConfig model_config;
+    model_config.grid = grid;
+    model_config.breakage_model =
+        pbe_cuda::BreakageModel::linear_symmetric(cfg::S0, v_ref);
+    pbe_cuda::CudaWorkspace workspace(pbe_cuda::CudaStream::external(0));
+    const pbe_cuda::CudaPBEModel model(model_config, 256, workspace.stream());
 
     const double dt = cfg::t_end / cfg::n_steps;
 
@@ -137,12 +124,12 @@ int main()
     auto rhs_func = [&](const DeviceArray<double>& N_in,
                         DeviceArray<double>&       rhs_out) 
     {
-        rhs_out.zero();
-        cudaError_t err = pbe_cuda::launch_breakage_rhs(
-            N_in.get(), d_x.get(), d_t_q.get(), d_bw_q.get(),
-            rhs_out.get(), params);
+        cudaError_t err = model.compute_rhs(
+            pbe_cuda::ConstDeviceRealView(N_in.get(), N_in.size()),
+            pbe_cuda::DeviceRealView(rhs_out.get(), rhs_out.size()),
+            workspace);
         if (err != cudaSuccess) {
-            std::fprintf(stderr, "Kernel error: %s\n", cudaGetErrorString(err));
+            std::fprintf(stderr, "RHS error: %s\n", cudaGetErrorString(err));
             std::exit(EXIT_FAILURE);
         }
         PBE_CUDA_CHECK(cudaDeviceSynchronize());
